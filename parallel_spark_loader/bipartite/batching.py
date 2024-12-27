@@ -1,7 +1,8 @@
 
 from pyspark.sql.functions import col
+from pyspark.sql import DataFrame
 
-def create_ingest_batches_from_groups(spark_dataframe) -> ...:
+def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     """
     Create batches for ingest into Neo4j.
     Add a `batch` column to the Spark DataFrame identifying which batch the group in that row belongs to.
@@ -14,10 +15,12 @@ def create_ingest_batches_from_groups(spark_dataframe) -> ...:
 
     Returns
     -------
-    ...
+    DataFrame
         _description_
     """
-    ...
+    
+    # assert that source_group and target_group exist in the dataframe
+    # assert that the column types for above are IntegerType()
 
     source_group_count = (spark_dataframe.select('source_group')
                           .distinct()
@@ -29,9 +32,9 @@ def create_ingest_batches_from_groups(spark_dataframe) -> ...:
     
     num_colors = max(source_group_count, target_group_count)
 
-    spark_data_frame = spark_data_frame.withColumn(
+    spark_dataframe = spark_dataframe.withColumn(
         'batch', 
         (col('source_group') + col('target_group')) % num_colors
         )
     
-    return spark_data_frame
+    return spark_dataframe

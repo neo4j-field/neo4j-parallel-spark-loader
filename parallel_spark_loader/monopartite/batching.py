@@ -1,5 +1,8 @@
+from typing import Dict, Tuple
 
-def create_ingest_batches_from_groups(spark_dataframe, spark) -> ...:
+from pyspark.sql import DataFrame, SparkSession
+
+def create_ingest_batches_from_groups(spark_dataframe: DataFrame, spark: SparkSession) -> DataFrame:
     """
     Create batches for ingest into Neo4j.
     Add a `batch` column to the Spark DataFrame identifying which batch the group in that row belongs to.
@@ -32,15 +35,15 @@ def create_ingest_batches_from_groups(spark_dataframe, spark) -> ...:
 
     # Join the DataFrames
     result_df = spark_dataframe.join(
-        coloring_df,
-        (spark_dataframe.source_group == coloring_df.source_group) &
+        other=coloring_df,
+        on=(spark_dataframe.source_group == coloring_df.source_group) &
         (spark_dataframe.target_group == coloring_df.target_group),
-        "left"  # Use left join to keep all records from spark_dataframe
+        how="left"  # Use left join to keep all records from spark_dataframe
     )
 
     return result_df
 
-def color_complete_graph_with_self_loops(n: int) -> dict:
+def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
     """
     Colors the edges of a complete graph with self loops using a rotating pattern.
     
@@ -54,37 +57,45 @@ def color_complete_graph_with_self_loops(n: int) -> dict:
     current_color = 0
     
     # Function to add edge with color (handling both orientations)
-    def add_edge_color(v1: int, v2: int, color: int):
+    def _add_edge_color(v1: int, v2: int, color: int) -> None:
+        """Assign a color to an edge - undirected."""
         edge_colors[(min(v1, v2), max(v1, v2))] = color
 
-    def step_through_edges(v1, v2, number_of_steps, color):
+    def _step_through_edges(v1: int, v2: int, number_of_steps: int, color: int) -> None:
+        """
+        Assign a color to a group of edges (the number of steps = number of edges) where neither the 
+        source nor target node are associated with that color already.
+        """
+
         for i in range(number_of_steps):
             vertex1 = (v1 - i) % n
             vertex2 = (v2 + i) % n
             if (min(vertex1, vertex2), max(vertex1, vertex2)) not in edge_colors:
-                add_edge_color(vertex1, vertex2, color)
-            else:
-                print(f"{min(vertex1, vertex2), max(vertex1, vertex2)} is already colored")
+                _add_edge_color(vertex1, vertex2, color)
+            # else:
+            #     print(f"{min(vertex1, vertex2), max(vertex1, vertex2)} is already colored")
 
+    # even number of nodes
     if n%2 == 0:
         # Color even-distance edges
         for start in range(n//2):
             v1 = start
             v2 = start
-            step_through_edges(v1, v2, n//2+1, current_color)
+            _step_through_edges(v1, v2, n//2+1, current_color)
             current_color += 1
         # Color odd-distance edges
         for start in range(n//2):
             v1 = start
             v2 = start + 1
-            step_through_edges(v1, v2, n//2, current_color)
+            _step_through_edges(v1, v2, n//2, current_color)
             current_color += 1
-
+    # odd number of nodes
     else:
+        # color even and odd distance edges
         for start in range(n):
             v1 = start
             v2 = start
-            step_through_edges(v1, v2, n//2 + 1, current_color)
+            _step_through_edges(v1, v2, n//2 + 1, current_color)
             current_color += 1
         
     return edge_colors

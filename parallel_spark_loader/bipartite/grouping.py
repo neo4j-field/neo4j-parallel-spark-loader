@@ -22,6 +22,13 @@ def _create_node_groupings(spark_dataframe, source_col: str, target_col: str, nu
     """
     ...
 
+    # to create buckets
+    # run over source and target INDEPENDENTLY
+    # group by and count
+    # iterate through the values in max -> min order ex: [{key: Amazon, value_count: 100000}, ...]
+    # find most-empty bucket (num_groups) and place value in it and increment bucket value by value_count
+    # # track with 2 separate hash maps
+
 def _create_value_count_column(spark_dataframe, source_col: str, target_col: str, num_groups: int) -> ...:
     """
     Create `source_value_count` and `target_value_count` to inform node groupings.

@@ -9,8 +9,9 @@ readme = "README.md"
 python = "^3.12"
 pyspark = "^3.5.4"
 
-[tool.poetry.dependencies.development]
+[tool.poetry.group.dev.dependencies]
 pytest = "^8.3.4"
+pandas = "^2.2.3"
 
 
 [build-system]
