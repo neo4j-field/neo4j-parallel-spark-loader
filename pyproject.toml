@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "parallel-spark-loader"
+version = "0.1.0"
+description = "Load relationships in parallel into Neo4j using Spark"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pyspark = "^3.5.4"
+
+[tool.poetry.dependencies.development]
+pytest = "^8.3.4"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
