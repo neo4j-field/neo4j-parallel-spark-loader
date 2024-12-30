@@ -1,4 +1,3 @@
-
 def _create_ingest_batches_from_groups(spark_dataframe) -> ...:
     """
     Create batches for ingest into Neo4j.

@@ -1,6 +1,6 @@
-
-from pyspark.sql.functions import col
 from pyspark.sql import DataFrame
+from pyspark.sql.functions import col
+
 
 def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     """
@@ -18,23 +18,18 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     DataFrame
         _description_
     """
-    
+
     # assert that source_group and target_group exist in the dataframe
     # assert that the column types for above are IntegerType()
 
-    source_group_count = (spark_dataframe.select('source_group')
-                          .distinct()
-                          .count())
-    
-    target_group_count = (spark_dataframe.select('target_group')
-                          .distinct()
-                          .count())
-    
+    source_group_count = spark_dataframe.select("source_group").distinct().count()
+
+    target_group_count = spark_dataframe.select("target_group").distinct().count()
+
     num_colors = max(source_group_count, target_group_count)
 
     spark_dataframe = spark_dataframe.withColumn(
-        'batch', 
-        (col('source_group') + col('target_group')) % num_colors
-        )
-    
+        "batch", (col("source_group") + col("target_group")) % num_colors
+    )
+
     return spark_dataframe

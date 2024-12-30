@@ -1,4 +1,3 @@
-
 def ingest_spark_dataframe_into_neo4j(spark_dataframe, spark_session) -> None:
     """
     Ingest the Spark DataFrame into Neo4j in parallel.

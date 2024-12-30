@@ -2,7 +2,7 @@
 name = "parallel-spark-loader"
 version = "0.1.0"
 description = "Load relationships in parallel into Neo4j using Spark"
-authors = ["Your Name <you@example.com>"]
+authors = ["Alex Gilmore", "Nathan Smith"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
