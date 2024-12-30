@@ -1,15 +1,15 @@
 from typing import Dict
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import concat, col, lit
+from pyspark.sql.functions import col, concat, lit
 
 
 def create_value_groupings(
     value_counts_spark_dataframe: DataFrame,
-    spark: SparkSession,
     num_groups: int,
     grouping_column: str = "combined_col",
 ):
+    spark: SparkSession = value_counts_spark_dataframe.sparkSession
     # to create buckets
     # # track with 2 separate hash maps
     counts_bucket = {i: 0 for i in range(num_groups)}
@@ -47,9 +47,37 @@ def _get_smallest_bucket_id(bucket: Dict[int, int]) -> int:
 
     return min_bucket_id
 
-def _create_final_group_column_from_source_and_target_groups(spark_dataframe: DataFrame) -> DataFrame:
+
+def _create_final_group_column_from_source_and_target_groups(
+    spark_dataframe: DataFrame,
+) -> DataFrame:
     """Add a `final_group` column to the Spark DataFrame."""
 
     return spark_dataframe.withColumn(
         "final_group", concat(col("source_group"), lit(" --> "), col("target_group"))
     )
+
+
+def create_value_counts_dataframe(
+    spark_dataframe: DataFrame, grouping_column: str
+) -> DataFrame:
+    """
+    Create a `count` column based on the `grouping_column` argument.
+
+    Parameters
+    ----------
+    spark_dataframe : DataFrame
+        _description_
+    grouping_column : str
+        _description_
+
+    Returns
+    -------
+    DataFrame
+        _description_
+    """
+    sdf_filtered = spark_dataframe.select(grouping_column)
+
+    counts_df: DataFrame = sdf_filtered.groupBy(grouping_column).count()
+
+    return counts_df

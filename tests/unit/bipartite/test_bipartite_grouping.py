@@ -4,8 +4,8 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, countDistinct
 
 from parallel_spark_loader.bipartite.grouping import (
-    _create_value_counts_dataframe,
     create_node_groupings,
+    create_value_counts_dataframe,
 )
 
 
@@ -13,7 +13,7 @@ def test_create_value_counts_dataframe(
     spark_fixture: SparkSession, bipartite_grouping_data: List[Dict[str, int]]
 ) -> None:
     sdf = spark_fixture.createDataFrame(bipartite_grouping_data)
-    result: DataFrame = _create_value_counts_dataframe(
+    result: DataFrame = create_value_counts_dataframe(
         spark_dataframe=sdf, grouping_column="source_node"
     )
 

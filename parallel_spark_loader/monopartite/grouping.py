@@ -1,13 +1,15 @@
 from typing import Dict
 
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame
 
-from ..utils.grouping import create_value_groupings, _create_final_group_column_from_source_and_target_groups
+from ..utils.grouping import (
+    _create_final_group_column_from_source_and_target_groups,
+    create_value_groupings,
+)
 
 
 def create_node_groupings(
     spark_dataframe: DataFrame,
-    spark: SparkSession,
     source_col: str,
     target_col: str,
     num_groups: int,
@@ -35,12 +37,12 @@ def create_node_groupings(
 
     # stack source and target
     # group by and count
-    counts_df = _create_value_counts_dataframe(
+    counts_df = create_value_counts_dataframe(
         spark_dataframe=spark_dataframe, source_col=source_col, target_col=target_col
     )
 
     keys_sdf = create_value_groupings(
-        value_counts_spark_dataframe=counts_df, spark=spark, num_groups=num_groups
+        value_counts_spark_dataframe=counts_df, num_groups=num_groups
     )
 
     final_sdf = spark_dataframe.join(
@@ -61,7 +63,7 @@ def create_node_groupings(
     return final_sdf
 
 
-def _create_value_counts_dataframe(
+def create_value_counts_dataframe(
     spark_dataframe: DataFrame, source_col: str, target_col: str
 ) -> DataFrame:
     """

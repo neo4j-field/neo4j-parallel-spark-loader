@@ -1,6 +1,10 @@
 from pyspark.sql import DataFrame, SparkSession
 
-from ..utils.grouping import create_value_groupings, _create_final_group_column_from_source_and_target_groups
+from ..utils.grouping import (
+    _create_final_group_column_from_source_and_target_groups,
+    create_value_counts_dataframe,
+    create_value_groupings,
+)
 
 
 def create_node_groupings(
@@ -27,15 +31,13 @@ def create_node_groupings(
         The Spark DataFrame with `source_group` and `target_group` columns added.
     """
 
-    spark: SparkSession = spark_dataframe.sparkSession
-
     # to create buckets
     # run over source and target INDEPENDENTLY
     # group by and count
-    source_count_sdf = _create_value_counts_dataframe(
+    source_count_sdf = create_value_counts_dataframe(
         spark_dataframe=spark_dataframe, grouping_column=source_col
     )
-    target_count_sdf = _create_value_counts_dataframe(
+    target_count_sdf = create_value_counts_dataframe(
         spark_dataframe=spark_dataframe, grouping_column=target_col
     )
 
@@ -44,13 +46,11 @@ def create_node_groupings(
     # # track with 2 separate hash maps
     source_groupings_sdf = create_value_groupings(
         value_counts_spark_dataframe=source_count_sdf,
-        spark=spark,
         num_groups=num_groups,
         grouping_column=source_col,
     )
     target_groupings_sdf = create_value_groupings(
         value_counts_spark_dataframe=target_count_sdf,
-        spark=spark,
         num_groups=num_groups,
         grouping_column=target_col,
     )
@@ -71,26 +71,3 @@ def create_node_groupings(
     final_sdf = _create_final_group_column_from_source_and_target_groups(final_sdf)
 
     return final_sdf
-
-
-def _create_value_counts_dataframe(spark_dataframe, grouping_column: str) -> DataFrame:
-    """
-    Create a `count` column based on the `grouping_column` argument.
-
-    Parameters
-    ----------
-    spark_dataframe : DataFrame
-        _description_
-    grouping_column : str
-        _description_
-
-    Returns
-    -------
-    DataFrame
-        _description_
-    """
-    combined_df = spark_dataframe.select(grouping_column)
-
-    counts_df: DataFrame = combined_df.groupBy(grouping_column).count()
-
-    return counts_df
