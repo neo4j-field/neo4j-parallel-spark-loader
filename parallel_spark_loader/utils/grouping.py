@@ -1,10 +1,14 @@
 from typing import Dict
 
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.functions import concat, col, lit
 
 
 def create_value_groupings(
-    value_counts_spark_dataframe: DataFrame, spark: SparkSession, num_groups: int
+    value_counts_spark_dataframe: DataFrame,
+    spark: SparkSession,
+    num_groups: int,
+    grouping_column: str = "combined_col",
 ):
     # to create buckets
     # # track with 2 separate hash maps
@@ -21,7 +25,7 @@ def create_value_groupings(
         counts_bucket[smallest_bucket_id] = (
             counts_bucket.get(smallest_bucket_id) + row["count"]
         )
-        keys_bucket.get(smallest_bucket_id).append(row["combined_col"])
+        keys_bucket.get(smallest_bucket_id).append(row[grouping_column])
 
     key_to_group_map = list()
     for bucket_id, lst in keys_bucket.items():
@@ -42,3 +46,10 @@ def _get_smallest_bucket_id(bucket: Dict[int, int]) -> int:
             min_bucket_id = k
 
     return min_bucket_id
+
+def _create_final_group_column_from_source_and_target_groups(spark_dataframe: DataFrame) -> DataFrame:
+    """Add a `final_group` column to the Spark DataFrame."""
+
+    return spark_dataframe.withColumn(
+        "final_group", concat(col("source_group"), lit(" --> "), col("target_group"))
+    )

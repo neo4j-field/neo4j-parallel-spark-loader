@@ -2,7 +2,7 @@ from typing import Dict
 
 from pyspark.sql import DataFrame, SparkSession
 
-from ..utils.grouping import create_value_groupings
+from ..utils.grouping import create_value_groupings, _create_final_group_column_from_source_and_target_groups
 
 
 def create_node_groupings(
@@ -55,6 +55,8 @@ def create_node_groupings(
     ).drop(keys_sdf.value)
 
     final_sdf = final_sdf.drop("value")
+
+    final_sdf = _create_final_group_column_from_source_and_target_groups(final_sdf)
 
     return final_sdf
 

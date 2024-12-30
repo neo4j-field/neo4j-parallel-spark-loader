@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import countDistinct
+from pyspark.sql.functions import col, countDistinct
 
 from parallel_spark_loader.monopartite.grouping import (
     _create_value_counts_dataframe,
@@ -65,3 +65,7 @@ def test_create_node_groupings(
     assert source_group_count <= 4
     assert target_group_count <= 4
     assert combined_group_count <= 4
+    assert "final_group" in result.columns
+
+    for col_name in ["source_group", "target_group", "final_group"]:
+        assert result.filter(col(col_name).isNull()).count() == 0
