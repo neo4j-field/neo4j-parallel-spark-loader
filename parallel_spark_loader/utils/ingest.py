@@ -56,8 +56,8 @@ def ingest_spark_dataframe(
         "batch" in spark_dataframe.columns
     ), "Spark DataFrame must contain column `batch`"
     assert (
-        "grouping" in spark_dataframe.columns
-    ), "Spark DataFrame must contain column `grouping`"
+        "final_group" in spark_dataframe.columns
+    ), "Spark DataFrame must contain column `final_group`"
 
     batch_list = spark_dataframe.select(collect_set("batch")).first()[0]
 
@@ -69,7 +69,8 @@ def ingest_spark_dataframe(
     # write batches serially to Neo4j database
     for batch in batches:
         (
-            batch.write.partitionBy("grouping")  # define parallel groups for ingest
+            batch.repartition("final_group")  # define parallel groups for ingest
+            .write 
             .mode(save_mode)
             .format("org.neo4j.spark.DataSource")
             .options(**options)

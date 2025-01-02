@@ -3,7 +3,6 @@
 # Default target executed when no arguments are given to make.
 all: help
 
-
 coverage:
 	poetry run coverage run -m pytest tests/unit
 	poetry run coverage report --fail-under=85
