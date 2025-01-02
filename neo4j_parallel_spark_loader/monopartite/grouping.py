@@ -16,6 +16,7 @@ def create_node_groupings(
     Create node groupings for parallel ingest into Neo4j.
     Add `source_group`, `target_group` and `final_group` columns to the Spark DataFrame identifying which groups the row belongs in.
     `final_group` is a concatenation of the source and target group values.
+    It is recommended to have `num_groups` <= (2 * the number of workers available in the Spark cluster) for monopartite grouping.
 
     Parameters
     ----------
