@@ -1,13 +1,77 @@
-def ingest_spark_dataframe_into_neo4j(spark_dataframe, spark_session) -> None:
+from typing import Any, Dict, Literal
+
+from pyspark.sql import DataFrame
+from pyspark.sql.functions import col, collect_set
+
+
+def ingest_spark_dataframe(
+    spark_dataframe: DataFrame,
+    save_mode: Literal["Overwrite", "Append"],
+    options: Dict[str, Any],
+) -> None:
     """
-    Ingest the Spark DataFrame into Neo4j in parallel.
-    DataFrame must contain `grouping` and `batch` columns.
+    Saves a Spark DataFrame in multiple batches based on the 'batch' column values.
+    Each batch is partitioned by 'final_group' column and saved according to the provided options.
+    Ingest will be performed in parallel according to the `final_group` column values.
 
     Parameters
     ----------
-    spark_dataframe : _type_
-        _description_
-    spark_session : _type_
-        _description_
+    spark_dataframe : DataFrame
+        DataFrame containing 'batch' and 'grouping' columns.
+        The 'batch' column is used to split the data into separate batches.
+        The 'final_group' column is used for partitioning each batch.
+    save_mode : Literal["append", "overwrite"]
+        The Spark `mode` to use when ingesting data.
+    options : Dict[str, Any]
+        Dictionary of options to configure the DataFrame writer.
+        Refer to example for more information.
+
+    Example
+    -------
+    >>> options = {
+            "relationship": "BOUGHT",
+            "relationship.save.strategy": "keys",
+            "relationship.source.save.mode": "Match",
+            "relationship.source.labels": ":Customer",
+            "relationship.source.node.keys": "customerID:id",
+            "relationship.target.save.mode": "Match",
+            "relationship.target.labels": ":Product",
+            "relationship.target.node.keys": "customerID:id",
+            "relationship.properties": "quantity,order"
+        }
+    >>> save_batches(my_spark_df, "Append", options)
+
+    Note
+    ----
+    - The input DataFrame must contain 'batch' and 'grouping' columns
+    - Each unique value in the 'batch' column will create a separate save operation
+    - Uses the Neo4j Spark Connector for writing data to Neo4j
     """
-    ...
+
+    assert save_mode in {
+        "Append",
+        "Overwrite",
+    }, "`save_mode` must be either 'Append' or 'Overwrite'"
+    assert (
+        "batch" in spark_dataframe.columns
+    ), "Spark DataFrame must contain column `batch`"
+    assert (
+        "grouping" in spark_dataframe.columns
+    ), "Spark DataFrame must contain column `grouping`"
+
+    batch_list = spark_dataframe.select(collect_set("batch")).first()[0]
+
+    batches = [
+        spark_dataframe.filter(col("batch") == batch_value)
+        for batch_value in batch_list
+    ]
+
+    # write batches serially to Neo4j database
+    for batch in batches:
+        (
+            batch.write.partitionBy("grouping")  # define parallel groups for ingest
+            .mode(save_mode)
+            .format("org.neo4j.spark.DataSource")
+            .options(**options)
+            .save()
+        )

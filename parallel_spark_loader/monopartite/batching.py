@@ -3,23 +3,23 @@ from typing import Dict, Tuple
 from pyspark.sql import DataFrame, SparkSession
 
 
-def create_ingest_batches_from_groups(
-    spark_dataframe: DataFrame, spark: SparkSession
-) -> DataFrame:
+def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     """
     Create batches for ingest into Neo4j.
     Add a `batch` column to the Spark DataFrame identifying which batch the group in that row belongs to.
 
     Parameters
     ----------
-    spark_dataframe : _type_
-        _description_
+    spark_dataframe : DataFrame
+        The Spark DataFrame to operate on.
 
     Returns
     -------
-    ...
-        _description_
+    DataFrame
+        The Spark DataFrame with `batch` column.
     """
+
+    spark: SparkSession = spark_dataframe.sparkSession
 
     group_count = (
         spark_dataframe.select("source_group")
@@ -52,12 +52,17 @@ def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
     """
     Colors the edges of a complete graph with self loops using a rotating pattern.
 
-    Args:
-        n: Number of vertices in the graph
+    Parameters
+    ----------
+    n : int
+        Number of vertices in the graph
 
-    Returns:
+    Returns
+    -------
+    Dict[Tuple[int], int]
         Dictionary mapping edges (tuple) to colors (int)
     """
+
     edge_colors = {}
     current_color = 0
 

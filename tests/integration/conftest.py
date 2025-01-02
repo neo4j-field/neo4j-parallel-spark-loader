@@ -1,6 +1,8 @@
 from typing import Any, Generator
-from neo4j import GraphDatabase
+
 import pytest
+from neo4j import GraphDatabase
+
 
 @pytest.fixture(scope="session")
 def neo4j_driver() -> Generator[Any, Any, Any]:

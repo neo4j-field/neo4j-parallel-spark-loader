@@ -7,8 +7,25 @@ from pyspark.sql.functions import col, concat, lit
 def create_value_groupings(
     value_counts_spark_dataframe: DataFrame,
     num_groups: int,
-    grouping_column: str = "combined_col",
+    grouping_column: str,
 ):
+    """
+    Create a Spark DataFrame containing groupings according to property value counts.
+
+    Parameters
+    ----------
+    value_counts_spark_dataframe : DataFrame
+        The Spark DataFrame containing value counts under the `count` column.
+    num_groups : int
+        The number of groups to create.
+    grouping_column : str
+        The column that `count` column refers to.
+
+    Returns
+    -------
+    DataFrame
+        A Spark DataFrame containing columns `value` and `group`.
+    """
     spark: SparkSession = value_counts_spark_dataframe.sparkSession
     # to create buckets
     # # track with 2 separate hash maps
@@ -48,7 +65,7 @@ def _get_smallest_bucket_id(bucket: Dict[int, int]) -> int:
     return min_bucket_id
 
 
-def _create_final_group_column_from_source_and_target_groups(
+def create_final_group_column_from_source_and_target_groups(
     spark_dataframe: DataFrame,
 ) -> DataFrame:
     """Add a `final_group` column to the Spark DataFrame."""
@@ -67,14 +84,14 @@ def create_value_counts_dataframe(
     Parameters
     ----------
     spark_dataframe : DataFrame
-        _description_
+        The Spark DataFrame to operate on.
     grouping_column : str
-        _description_
+        The grouping column to use.
 
     Returns
     -------
     DataFrame
-        _description_
+        The value counts Spark DataFrame.
     """
     sdf_filtered = spark_dataframe.select(grouping_column)
 

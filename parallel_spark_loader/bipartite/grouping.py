@@ -1,7 +1,7 @@
-from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql import DataFrame
 
 from ..utils.grouping import (
-    _create_final_group_column_from_source_and_target_groups,
+    create_final_group_column_from_source_and_target_groups,
     create_value_counts_dataframe,
     create_value_groupings,
 )
@@ -9,26 +9,27 @@ from ..utils.grouping import (
 
 def create_node_groupings(
     spark_dataframe: DataFrame, source_col: str, target_col: str, num_groups: int
-) -> ...:
+) -> DataFrame:
     """
     Create node groupings for parallel ingest into Neo4j.
-    Add a `source_group` and `target_group` column to the Spark DataFrame identifying which groups the row belongs in.
+    Add `source_group`, `target_group` and `final_group` columns to the Spark DataFrame identifying which groups the row belongs in.
+    `final_group` is a concatenation of the source and target group values.
 
     Parameters
     ----------
-    spark_dataframe : _type_
-        _description_
+    spark_dataframe : DataFrame
+        The Spark DataFrame to operate on.
     source_col : str
-        _description_
+        The column indicating the relationship source id.
     target_col : str
-        _description_
+        The column indicating the relationship target id.
     num_groups : int
-        _description_
+        The desired number of groups to generate. The process may generate less groups as necessary.
 
     Returns
     -------
     DataFrame
-        The Spark DataFrame with `source_group` and `target_group` columns added.
+        The Spark DataFrame with added columns `source_group`, `target_group` and `final_group`.
     """
 
     # to create buckets
@@ -68,6 +69,6 @@ def create_node_groupings(
 
     final_sdf = final_sdf.drop("value")
 
-    final_sdf = _create_final_group_column_from_source_and_target_groups(final_sdf)
+    final_sdf = create_final_group_column_from_source_and_target_groups(final_sdf)
 
     return final_sdf

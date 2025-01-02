@@ -11,7 +11,7 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     Parameters
     ----------
     spark_dataframe : DataFrame
-        _description_
+        The Spark DataFrame to operate on.
 
     Returns
     -------

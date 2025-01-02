@@ -1,9 +1,7 @@
-from typing import Dict
-
 from pyspark.sql import DataFrame
 
 from ..utils.grouping import (
-    _create_final_group_column_from_source_and_target_groups,
+    create_final_group_column_from_source_and_target_groups,
     create_value_groupings,
 )
 
@@ -16,7 +14,8 @@ def create_node_groupings(
 ) -> DataFrame:
     """
     Create node groupings for parallel ingest into Neo4j.
-    Add a `source_group` and `target_group` column to the Spark DataFrame identifying which groups the row belongs in.
+    Add `source_group`, `target_group` and `final_group` columns to the Spark DataFrame identifying which groups the row belongs in.
+    `final_group` is a concatenation of the source and target group values.
 
     Parameters
     ----------
@@ -32,7 +31,7 @@ def create_node_groupings(
     Returns
     -------
     DataFrame
-        The input Spark DataFrame with added columns `source_group` and `target_group`.
+        The Spark DataFrame with added columns `source_group`, `target_group` and `final_group`.
     """
 
     # stack source and target
@@ -42,7 +41,9 @@ def create_node_groupings(
     )
 
     keys_sdf = create_value_groupings(
-        value_counts_spark_dataframe=counts_df, num_groups=num_groups
+        value_counts_spark_dataframe=counts_df,
+        num_groups=num_groups,
+        grouping_column="combined_col",
     )
 
     final_sdf = spark_dataframe.join(
@@ -58,7 +59,7 @@ def create_node_groupings(
 
     final_sdf = final_sdf.drop("value")
 
-    final_sdf = _create_final_group_column_from_source_and_target_groups(final_sdf)
+    final_sdf = create_final_group_column_from_source_and_target_groups(final_sdf)
 
     return final_sdf
 

@@ -54,7 +54,7 @@ def test_create_ingest_batches_from_groups(
         monopartite_batching_data, ["source_group", "target_group"]
     )
 
-    result = create_ingest_batches_from_groups(spark_dataframe=sdf, spark=spark_fixture)
+    result = create_ingest_batches_from_groups(spark_dataframe=sdf)
 
     null_count = result.filter(col("batch").isNull()).count()
     assert null_count == 0

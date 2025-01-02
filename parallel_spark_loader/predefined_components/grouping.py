@@ -1,24 +1,28 @@
+from pyspark.sql import DataFrame
+
 from ..utils.grouping import create_value_counts_dataframe, create_value_groupings
 
 
-def create_node_groupings(spark_dataframe, partition_col: str, num_groups: int) -> ...:
+def create_node_groupings(
+    spark_dataframe, partition_col: str, num_groups: int
+) -> DataFrame:
     """
     Create node groupings for parallel ingest into Neo4j.
-    Add a `grouping` column to the Spark DataFrame identifying which group the row belongs in.
+    Add a `final_group` column to the Spark DataFrame identifying which group the row belongs in.
 
     Parameters
     ----------
-    spark_dataframe : _type_
-        _description_
+    spark_dataframe : DataFrame
+        The Spark DataFrame to operate on.
     partition_col : str
-        _description_
+        The desired column to partition on.
     num_groups : int
-        _description_
+        The desired number of groups to generate. The process may generate less groups as necessary.
 
     Returns
     -------
-    ...
-        _description_
+    DataFrame
+        The Spark DataFrame with added column `final_group`.
     """
     ...
 
