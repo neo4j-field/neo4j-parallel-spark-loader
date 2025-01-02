@@ -1,7 +1,7 @@
 import pytest
 from pyspark.sql import DataFrame
 
-from parallel_spark_loader.utils.ingest import ingest_spark_dataframe
+from neo4j_parallel_spark_loader.utils.ingest import ingest_spark_dataframe
 
 
 def test_invalid_mode(utils_complete_spark_dataframe: DataFrame) -> None:

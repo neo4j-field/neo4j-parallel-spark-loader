@@ -2,7 +2,7 @@ from typing import Dict, List
 
 from pyspark.sql import DataFrame, SparkSession
 
-from parallel_spark_loader.utils.grouping import create_value_counts_dataframe
+from neo4j_parallel_spark_loader.utils.grouping import create_value_counts_dataframe
 
 
 def test_create_value_counts_dataframe(

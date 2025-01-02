@@ -3,7 +3,7 @@ from typing import Dict, List
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col
 
-from parallel_spark_loader.monopartite.batching import (
+from neo4j_parallel_spark_loader.monopartite.batching import (
     color_complete_graph_with_self_loops,
     create_ingest_batches_from_groups,
 )

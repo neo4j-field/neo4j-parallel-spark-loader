@@ -3,7 +3,7 @@ from typing import Dict, List
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, countDistinct
 
-from parallel_spark_loader.monopartite.grouping import (
+from neo4j_parallel_spark_loader.monopartite.grouping import (
     create_node_groupings,
     create_value_counts_dataframe,
 )

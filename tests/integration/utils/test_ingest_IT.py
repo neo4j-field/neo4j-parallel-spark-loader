@@ -2,7 +2,7 @@ from typing import Dict
 
 from pyspark.sql import DataFrame, SparkSession
 
-from parallel_spark_loader.utils.ingest import ingest_spark_dataframe
+from neo4j_parallel_spark_loader.utils.ingest import ingest_spark_dataframe
 
 
 def test_ingest_with_bipartite_spark_dataframe(
@@ -24,7 +24,7 @@ def test_ingest_with_bipartite_spark_dataframe(
     )
 
     nodes.show()
-    
+
     assert nodes.count() == 5
 
     rels_query = "match ()-[r]->() return type(r) as type, r{.*} as props"
