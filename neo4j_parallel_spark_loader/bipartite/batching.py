@@ -6,6 +6,7 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     """
     Create batches for ingest into Neo4j.
     Add a `batch` column to the Spark DataFrame identifying which batch the group in that row belongs to.
+    Remove `source_group` and `target_group` columns.
 
     Parameters
     ----------
@@ -29,6 +30,6 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
 
     spark_dataframe = spark_dataframe.withColumn(
         "batch", (col("source_group") + col("target_group")) % num_colors
-    )
+    ).drop(spark_dataframe.source_group, spark_dataframe.target_group)
 
     return spark_dataframe
