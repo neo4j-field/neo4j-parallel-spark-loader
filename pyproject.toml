@@ -11,6 +11,7 @@ pyspark = "^3.5.4"
 
 [tool.poetry.group.dev.dependencies]
 coverage = "^7.4.3"
+neo4j = "^5.27.0"
 pytest = "^8.3.4"
 pandas = "^2.2.3"
 pytest-mock = "^3.12.0"
