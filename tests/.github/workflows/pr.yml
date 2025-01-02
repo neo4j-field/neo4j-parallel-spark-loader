@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  e2e-tests:
+  tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -32,8 +32,6 @@ jobs:
           - 7687:7687
           - 7474:7474
     steps:
-      - name: Install graphviz package
-        run: sudo apt install graphviz graphviz-dev
       - name: Check out repository code
         uses: actions/checkout@v4
       - name: Docker Prune
