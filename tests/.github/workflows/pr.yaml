@@ -4,7 +4,7 @@ name: 'Neo4j Parallel Spark Loader Tests'
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
 
