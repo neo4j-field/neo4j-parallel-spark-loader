@@ -70,8 +70,7 @@ def ingest_spark_dataframe(
     for batch in batches:
         (
             batch.repartition("final_group")  # define parallel groups for ingest
-            .write 
-            .mode(save_mode)
+            .write.mode(save_mode)
             .format("org.neo4j.spark.DataSource")
             .options(**options)
             .save()

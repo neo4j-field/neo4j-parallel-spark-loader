@@ -10,6 +10,11 @@ coverage:
 test:
 	poetry run pytest tests
 
+test_local:
+	docker compose -f tests/integration/docker-compose.yml up -d	
+	poetry run pytest tests
+	docker compose -f tests/integration/docker-compose.yml stop
+
 test_integration_local:
 	docker compose -f tests/integration/docker-compose.yml up -d
 	poetry run pytest tests/integration -s

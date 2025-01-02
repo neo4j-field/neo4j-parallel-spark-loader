@@ -2,7 +2,9 @@ from typing import Dict, List
 
 from pyspark.sql import DataFrame, SparkSession
 
-from neo4j_parallel_spark_loader.bipartite.batching import create_ingest_batches_from_groups
+from neo4j_parallel_spark_loader.bipartite.batching import (
+    create_ingest_batches_from_groups,
+)
 
 
 def test_create_ingest_batches_from_groups(

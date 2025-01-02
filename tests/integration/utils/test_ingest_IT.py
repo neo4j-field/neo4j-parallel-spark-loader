@@ -9,6 +9,7 @@ def test_ingest_with_bipartite_spark_dataframe(
     bipartite_spark_dataframe: DataFrame,
     bipartite_ingest_options: Dict[str, str],
     spark_fixture: SparkSession,
+    healthcheck: None,
 ) -> None:
     ingest_spark_dataframe(
         spark_dataframe=bipartite_spark_dataframe,
@@ -36,5 +37,3 @@ def test_ingest_with_bipartite_spark_dataframe(
     )
 
     assert rels.count() == 5
-
-
