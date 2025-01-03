@@ -5,6 +5,8 @@ description = "Load relationships in parallel into Neo4j using Spark"
 authors = ["Alex Gilmore", "Nathan Smith"]
 readme = "README.md"
 
+exclude = ["tests/*", "benchmarking/*", "docs", "examples/*", "Makefile"]
+
 [tool.poetry.dependencies]
 python = "^3.10"
 pyspark = "^3.5.4"
@@ -17,6 +19,7 @@ pandas = "^2.2.3"
 pytest-mock = "^3.12.0"
 python-dotenv = "^1.0.1"
 ruff = "^0.3.0"
+ipykernel = "^6.29.5"
 
 [tool.ruff]
 target-version = "py312"

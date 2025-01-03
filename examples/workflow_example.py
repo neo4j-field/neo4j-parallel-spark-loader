@@ -32,4 +32,6 @@ ON CREATE SET r.quantity = event['quantity']
 """
 
 # Load groups in parallel for each batch
-ingest_spark_dataframe(batched_purchase_df, "Overwrite", {"query": includes_product_query})
+ingest_spark_dataframe(
+    batched_purchase_df, "Overwrite", {"query": includes_product_query}
+)
