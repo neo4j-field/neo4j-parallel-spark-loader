@@ -23,7 +23,7 @@ target-version = "py312"
 show-fixes = true
 
 [tool.coverage.paths]
-source = ["parallel_spark_loader"]
+source = ["neo4j_parallel_spark_loader"]
 
 [build-system]
 requires = ["poetry-core"]
