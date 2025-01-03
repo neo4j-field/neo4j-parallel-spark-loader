@@ -21,7 +21,7 @@ Imagine that you have a Spark DataFrame of order records. It includes columns `o
 from pyspark.sql import DataFrame, SparkSession
 
 from neo4j_parallel_spark_loader.bipartite import group_and_batch_spark_dataframe
-from neo4j_parallel_spark_loader.utils import ingest_spark_dataframe
+from neo4j_parallel_spark_loader import ingest_spark_dataframe
 
 spark_session: SparkSession = (
     SparkSession.builder.appName("Workflow Example")
