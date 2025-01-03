@@ -6,7 +6,7 @@ authors = ["Alex Gilmore", "Nathan Smith"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.10"
 pyspark = "^3.5.4"
 
 [tool.poetry.group.dev.dependencies]
