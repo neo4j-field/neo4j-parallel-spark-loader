@@ -37,9 +37,9 @@ format:
 
 help:
 	@echo '----'
-	@echo 'init........................ - initialize the repo for development (must still install Graphviz separately)'
 	@echo 'coverage.................... - run coverage report of unit tests'
 	@echo 'format...................... - run code formatters'
-	@echo 'test........................ - run all unit and integration tests'
+	@echo 'test........................ - run all unit and integration tests without setting up Neo4j docker instance'
+	@echo 'test_local.................. - run all unit and integration tests and set up Neo4j docker instance'
+	@echo 'test_integration_local...... - run all integration tests and set up Neo4j docker instance'
 	@echo 'test_unit................... - run all free unit tests'
-	@echo 'test_integration............ - run all integration tests'
