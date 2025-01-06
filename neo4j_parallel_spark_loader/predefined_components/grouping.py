@@ -1,14 +1,15 @@
 from pyspark.sql import DataFrame
 
 from ..utils.grouping import create_value_counts_dataframe, create_value_groupings
+from ..utils.verify_spark import verify_spark_version
 
 
 def create_node_groupings(
-    spark_dataframe, partition_col: str, num_groups: int
+    spark_dataframe: DataFrame, partition_col: str, num_groups: int
 ) -> DataFrame:
     """
     Create node groupings for parallel ingest into Neo4j.
-    Add a `final_group` column to the Spark DataFrame identifying which group the row belongs in.
+    Add a `group` column to the Spark DataFrame identifying which group the row belongs in.
 
     Parameters
     ----------
@@ -22,9 +23,10 @@ def create_node_groupings(
     Returns
     -------
     DataFrame
-        The Spark DataFrame with added column `final_group`.
+        The Spark DataFrame with added column `group`.
     """
-    ...
+
+    verify_spark_version(spark_session=spark_dataframe.sparkSession)
 
     # to create buckets
     # run over partition_col
@@ -42,7 +44,7 @@ def create_node_groupings(
     )
 
     final_sdf = spark_dataframe.join(
-        other=value_groupings_sdf.withColumnRenamed("group", "final_group"),
+        other=value_groupings_sdf,
         on=(spark_dataframe[partition_col] == value_groupings_sdf.value),
         how="left",
     ).drop(value_groupings_sdf.value)

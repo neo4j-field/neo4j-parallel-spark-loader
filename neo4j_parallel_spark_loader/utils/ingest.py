@@ -11,15 +11,15 @@ def ingest_spark_dataframe(
 ) -> None:
     """
     Saves a Spark DataFrame in multiple batches based on the 'batch' column values.
-    Each batch is partitioned by 'final_group' column and saved according to the provided options.
-    Ingest will be performed in parallel according to the `final_group` column values.
+    Each batch is partitioned by 'group' column and saved according to the provided options.
+    Ingest will be performed in parallel according to the `group` column values.
 
     Parameters
     ----------
     spark_dataframe : DataFrame
         DataFrame containing 'batch' and 'grouping' columns.
         The 'batch' column is used to split the data into separate batches.
-        The 'final_group' column is used for partitioning each batch.
+        The 'group' column is used for partitioning each batch.
     save_mode : Literal["append", "overwrite"]
         The Spark `mode` to use when ingesting data.
     options : Dict[str, Any]
@@ -56,8 +56,8 @@ def ingest_spark_dataframe(
         "batch" in spark_dataframe.columns
     ), "Spark DataFrame must contain column `batch`"
     assert (
-        "final_group" in spark_dataframe.columns
-    ), "Spark DataFrame must contain column `final_group`"
+        "group" in spark_dataframe.columns
+    ), "Spark DataFrame must contain column `group`"
 
     batch_list = spark_dataframe.select(collect_set("batch")).first()[0]
 
@@ -69,7 +69,7 @@ def ingest_spark_dataframe(
     # write batches serially to Neo4j database
     for batch in batches:
         (
-            batch.repartition("final_group")  # define parallel groups for ingest
+            batch.repartition("group")  # define parallel groups for ingest
             .write.mode(save_mode)
             .format("org.neo4j.spark.DataSource")
             .options(**options)

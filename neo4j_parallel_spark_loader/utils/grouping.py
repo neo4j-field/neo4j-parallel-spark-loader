@@ -65,13 +65,13 @@ def _get_smallest_bucket_id(bucket: Dict[int, int]) -> int:
     return min_bucket_id
 
 
-def create_final_group_column_from_source_and_target_groups(
+def create_group_column_from_source_and_target_groups(
     spark_dataframe: DataFrame,
 ) -> DataFrame:
-    """Add a `final_group` column to the Spark DataFrame."""
+    """Add a `group` column to the Spark DataFrame."""
 
     return spark_dataframe.withColumn(
-        "final_group", concat(col("source_group"), lit(" --> "), col("target_group"))
+        "group", concat(col("source_group"), lit(" --> "), col("target_group"))
     )
 
 
