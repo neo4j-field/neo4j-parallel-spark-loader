@@ -20,8 +20,8 @@ def test_create_node_groupings(
         num_groups=4,
     )
 
-    group_count = result.select(countDistinct("final_group")).collect()[0][0]
+    group_count = result.select(countDistinct("group")).collect()[0][0]
 
     assert group_count == 2
-    assert "final_group" in result.columns
-    assert result.filter(col("final_group").isNull()).count() == 0
+    assert "group" in result.columns
+    assert result.filter(col("group").isNull()).count() == 0
