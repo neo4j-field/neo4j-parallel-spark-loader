@@ -1,7 +1,10 @@
+import os
+from datetime import datetime
 from timeit import timeit
 from typing import Any, Callable, Dict, Literal, Optional
 
 import pandas as pd
+import toml
 from pyspark.sql import DataFrame
 
 
@@ -61,5 +64,18 @@ def generate_benchmark_results(
     )
 
 
+def _get_package_version() -> str:
+    with open("../pyproject.toml", "r") as f:
+        config = toml.load(f)
+        return config["tool"]["poetry"]["version"]
+
+
 def save_dataframe(dataframe: pd.DataFrame) -> None:
-    dataframe.to_csv("output/benchmark_results.csv", index=False)
+    ts = str(datetime.now())
+    version = "v" + _get_package_version()
+    path = f"output/{version}"
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    dataframe.to_csv(f"{path}/benchmark_results-{ts}.csv", index=False)
