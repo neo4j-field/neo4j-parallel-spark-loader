@@ -46,7 +46,7 @@ def test_create_node_groupings(
     assert source_group_count <= 4
     assert target_group_count <= 4
 
-    assert "final_group" in result.columns
+    assert "group" in result.columns
 
-    for col_name in ["source_group", "target_group", "final_group"]:
+    for col_name in ["source_group", "target_group", "group"]:
         assert result.filter(col(col_name).isNull()).count() == 0

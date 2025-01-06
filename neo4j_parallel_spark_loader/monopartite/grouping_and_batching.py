@@ -9,9 +9,9 @@ def group_and_batch_spark_dataframe(
 ) -> DataFrame:
     """
     Create node groupings and batches for parallel ingest into Neo4j.
-    Add `final_group` and `batch` columns to the Spark DataFrame identifying which grous and batch the row belongs in.
-    `final_group` is a concatenation of the source and target group values.
-    `final_group` and `batch` are utilized during ingestion.
+    Add `group` and `batch` columns to the Spark DataFrame identifying which grous and batch the row belongs in.
+    `group` is a concatenation of the source and target group values.
+    `group` and `batch` are utilized during ingestion.
 
     Parameters
     ----------
@@ -27,7 +27,7 @@ def group_and_batch_spark_dataframe(
     Returns
     -------
     DataFrame
-        The Spark DataFrame with added columns `final_group` and `batch`.
+        The Spark DataFrame with added columns `group` and `batch`.
     """
 
     grouped_sdf = create_node_groupings(
