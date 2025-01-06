@@ -28,8 +28,8 @@ def generate_partitioned_dataframe(
     num_rows: int, alpha: float, partition_count: int
 ) -> pd.DataFrame:
     mean_partition_size = num_rows / partition_count
-    min_partition_size = mean_partition_size * 0.8
-    max_partition_size = mean_partition_size * 1.2
+    min_partition_size = int(mean_partition_size * 0.8)
+    max_partition_size = int(mean_partition_size * 1.2)
     partition_sizes = [
         randint(min_partition_size, max_partition_size)
         for i in range(0, partition_count - 1)

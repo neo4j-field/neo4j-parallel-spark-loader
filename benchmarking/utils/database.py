@@ -1,5 +1,7 @@
+from neo4j import Driver
 from pyspark.sql import DataFrame, SparkSession
 
+from benchmarking.utils.neo4j_driver import create_neo4j_driver
 from neo4j_parallel_spark_loader import (
     bipartite,
     ingest_spark_dataframe,
@@ -15,12 +17,19 @@ def create_constraints(spark_session: SparkSession) -> None:
 create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;
 create constraint node_b_constraint if not exists for (n:NodeB) require n.id is node key;
 """
-    df.write.format("org.neo4j.spark.DataSource").option("query", query).save()
+    df.write.format("org.neo4j.spark.DataSource").mode("Overwrite").option(
+        "query", query
+    ).save()
 
 
 def load_bipartite_nodes(spark_dataframe: DataFrame) -> None:
     node_a = spark_dataframe.select("source").distinct()
     node_b = spark_dataframe.select("target").distinct()
+
+    constraints_query = """
+create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;
+create constraint node_b_constraint if not exists for (n:NodeB) require n.id is node key;
+"""
 
     query_a = """
 MERGE (:NodeA {id: event.source})
@@ -29,9 +38,20 @@ MERGE (:NodeA {id: event.source})
 MERGE (:NodeB {id: event.target})
 """
 
-    (node_a.write.format("org.neo4j.spark.DataSource").option("query", query_a).save())
+    (
+        node_a.write.format("org.neo4j.spark.DataSource")
+        .mode("Overwrite")
+        .option("query", query_a)
+        .option("script", constraints_query)
+        .save()
+    )
 
-    (node_b.write.format("org.neo4j.spark.DataSource").option("query", query_b).save())
+    (
+        node_b.write.format("org.neo4j.spark.DataSource")
+        .mode("Overwrite")
+        .option("query", query_b)
+        .save()
+    )
 
 
 def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
@@ -46,11 +66,21 @@ def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
         )
     )
 
+    constraints_query = """
+create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;
+"""
+
     query_a = """
 MERGE (:NodeA {id: event.id})
 """
 
-    (node_a.write.format("org.neo4j.spark.DataSource").option("query", query_a).save())
+    (
+        node_a.write.format("org.neo4j.spark.DataSource")
+        .mode("Overwrite")
+        .option("query", query_a)
+        .option("script", constraints_query)
+        .save()
+    )
 
 
 def load_bipartite_relationships_in_serial(spark_dataframe: DataFrame) -> None:
@@ -63,6 +93,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
     (
         rels.coalesce(1)
         .write.format("org.neo4j.spark.DataSource")
+        .mode("Overwrite")
         .option("query", query)
         .save()
     )
@@ -78,6 +109,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
     (
         rels.coalesce(1)
         .write.format("org.neo4j.spark.DataSource")
+        .mode("Overwrite")
         .option("query", query)
         .save()
     )
@@ -100,7 +132,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
 
     ingest_spark_dataframe(
         spark_dataframe=grouped_and_batched_sdf,
-        save_mode="overwrite",
+        save_mode="Overwrite",
         options={"query": query},
     )
 
@@ -122,7 +154,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
 
     ingest_spark_dataframe(
         spark_dataframe=grouped_and_batched_sdf,
-        save_mode="overwrite",
+        save_mode="Overwrite",
         options={"query": query},
     )
 
@@ -137,15 +169,13 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
 """
     grouped_and_batched_sdf = predefined_components.group_and_batch_spark_dataframe(
         spark_dataframe=spark_dataframe,
-        source_col="source",
-        target_col="target",
-        partition_col="parition_col",
+        partition_col="partition_col",
         num_groups=num_groups,
     )
 
     ingest_spark_dataframe(
         spark_dataframe=grouped_and_batched_sdf,
-        save_mode="overwrite",
+        save_mode="Overwrite",
         options={"query": query},
     )
 
@@ -156,12 +186,13 @@ def delete_relationships(spark_session: SparkSession) -> None:
 MATCH ()-[r]->()
 DELETE r
 """
-    df.write.format("org.neo4j.spark.DataSource").option("query", query).save()
+    df.write.format("org.neo4j.spark.DataSource").mode("Overwrite").option(
+        "query", query
+    ).save()
 
 
-def restore_database(spark_session: SparkSession) -> None:
-    df: DataFrame = spark_session.createDataFrame([{"value": 0}])
+def restore_database(neo4j_driver: Driver) -> None:
+    script = "create or replace database neo4j;"
 
-    query = "create or replace database neo4j;"
-
-    df.write.format("org.neo4j.spark.DataSource").option("query", query).save()
+    with neo4j_driver.session() as session:
+        session.run(script)

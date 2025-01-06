@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 from timeit import timeit
 from typing import Any, Callable, Dict, Literal, Optional
 
@@ -23,7 +22,7 @@ def create_results_dataframe() -> pd.DataFrame:
 def append_results_to_dataframe(
     target_dataframe: pd.DataFrame, new_data: Dict[str, Any]
 ) -> pd.DataFrame:
-    return target_dataframe.append(new_data, ignore_index=True)
+    return pd.concat([target_dataframe, pd.DataFrame([new_data])], ignore_index=False)
 
 
 def create_row(
@@ -51,9 +50,11 @@ def generate_benchmark_results(
 ) -> Dict[str, Any]:
     row_count = spark_dataframe.count()
     if num_groups is not None:
-        load_time = timeit(ingest_function(spark_dataframe, num_groups), number=1)
+        load_time = timeit(
+            lambda: ingest_function(spark_dataframe, num_groups), number=1
+        )
     else:
-        load_time = timeit(ingest_function(spark_dataframe), number=1)
+        load_time = timeit(lambda: ingest_function(spark_dataframe), number=1)
 
     return create_row(
         row_count=row_count,
@@ -70,8 +71,7 @@ def _get_package_version() -> str:
         return config["tool"]["poetry"]["version"]
 
 
-def save_dataframe(dataframe: pd.DataFrame) -> None:
-    ts = str(datetime.now())
+def save_dataframe(dataframe: pd.DataFrame, ts: str) -> None:
     version = "v" + _get_package_version()
     path = f"output/{version}"
 
