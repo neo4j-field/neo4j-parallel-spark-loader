@@ -105,8 +105,8 @@ def generate_monopartite_spark_dataframe(num_rows: int) -> DataFrame:
 
 
 def generate_predefined_components_spark_dataframe(num_rows: int) -> DataFrame:
-    source_values = []
-    target_values = []
+    source_values = ["a", "b", "c"]
+    target_values = ["d", "e", "f"]
     partition_values = []
     return _generate_spark_dataframe(
         source_values=source_values,
