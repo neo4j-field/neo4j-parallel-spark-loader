@@ -1,7 +1,7 @@
 from pyspark.sql import DataFrame, SparkSession
 
-from neo4j_parallel_spark_loader.bipartite import group_and_batch_spark_dataframe
 from neo4j_parallel_spark_loader import ingest_spark_dataframe
+from neo4j_parallel_spark_loader.bipartite import group_and_batch_spark_dataframe
 
 spark_session: SparkSession = (
     SparkSession.builder.appName("Workflow Example")
@@ -32,4 +32,6 @@ ON CREATE SET r.quantity = event['quantity']
 """
 
 # Load groups in parallel for each batch
-ingest_spark_dataframe(batched_purchase_df, "Overwrite", {"query": includes_product_query})
+ingest_spark_dataframe(
+    batched_purchase_df, "Overwrite", {"query": includes_product_query}
+)

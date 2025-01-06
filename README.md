@@ -100,3 +100,17 @@ We can visualize the nodes within the same group as a single aggregated node and
 ![Diagram showing aggregated bipartite relationships colored by group](./docs/assets/images/monopartite-coloring-diagram.png)
 
 In the aggregated biparite diagram, multiple relationships (each representing a group of individual relationships) connect to each node (representing a group of nodes). Because nodes could be either source or target, there are no arrow heads in the diagram representing relationship direction. However, the nodes are always stored with a direction in Neo4j. Using the rotational symmetry of the complete graph, the relationships are colored so that no relationships of the same color connect to the same node. The relationship colors represent the batches applied to the data. In the picture above, the relationship groups represented by red arrows can be processed in parallel because no node groups are connected to more than one red relationship group. After the red batch has completed, each additional color batch can be processed in turn until all relationships have been loaded. Notice that with five node groups, each color batch contains three relationship groups. This demonstrates why the number of groups should be larger than the number of Spark workers that you want to keep occupied.
+
+## Workflow Visualization
+
+The visualization module may be used to create a heatmap of the workflow. 
+
+* Groups are identified as rows and batches are identified as columns. 
+* Batches are displayed sequentially in the order they are processed in.
+* The value in each group & batch pair indicates how many rows are processed in that step.
+
+This function may be imported with `from neo4j_parallel_spark_loader.visualize import create_ingest_heatmap` and takes a Spark DataFrame with columns including `group` and `batch` as input.
+
+Here is an example of a generated heatmap with dummy data:
+
+![Example heatmap generated with the visualization module](./docs/assets/images/example-heatmap.png)
