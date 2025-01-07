@@ -3,6 +3,7 @@
 ### Fixed
 
 * Fix monopartite batch assignment bug
+* Fix bug in ingest where partitioning was not performed according to defined groups
 
 ### Changed
 
