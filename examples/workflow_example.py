@@ -18,9 +18,11 @@ spark_session: SparkSession = (
 
 purchase_df: DataFrame = spark_session.createDataFrame(data=...)
 
+NUM_GROUPS = 8
+
 # Create batches and groups
 batched_purchase_df = group_and_batch_spark_dataframe(
-    purchase_df, "customer_id", "store_id", 8
+    purchase_df, "customer_id", "store_id", NUM_GROUPS
 )
 
 # Load to Neo4j

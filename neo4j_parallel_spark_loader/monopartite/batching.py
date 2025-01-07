@@ -39,16 +39,15 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
         coloring_data, ["source_group", "target_group", "batch"]
     )
 
-    reverse_coloring_df = (coloring_df
-                           .filter(col("source_group") != col("target_group"))
-                           .select(
-                               col("target_group").alias("source_group"),
-                               col("source_group").alias("target_group"),
-                               col("batch"))
+    reverse_coloring_df = coloring_df.filter(
+        col("source_group") != col("target_group")
+    ).select(
+        col("target_group").alias("source_group"),
+        col("source_group").alias("target_group"),
+        col("batch"),
     )
 
     coloring_df = coloring_df.union(reverse_coloring_df)
-
 
     # Join the DataFrames
     result_df = spark_dataframe.join(
