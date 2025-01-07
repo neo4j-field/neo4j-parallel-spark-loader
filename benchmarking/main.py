@@ -27,10 +27,13 @@ def load_data_into_spark_dataframe(
 
     return spark_session.read.option("header", True).csv(file_path)
 
-def sample_spark_dataframe(spark_dataframe: DataFrame, desired_number: int) -> DataFrame:
+
+def sample_spark_dataframe(
+    spark_dataframe: DataFrame, desired_number: int
+) -> DataFrame:
     """Work-around for Spark's inaccurate sampling method."""
-    
-    fraction = desired_number / spark_dataframe.count() * 1.2
+
+    fraction = min(desired_number / spark_dataframe.count() * 1.1, 1.0)
 
     return spark_dataframe.sample(False, fraction, seed=42).limit(desired_number)
 
