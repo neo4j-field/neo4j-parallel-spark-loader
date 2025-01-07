@@ -15,6 +15,7 @@
 * Replace `final_group` column with `group` column
 * Add heatmap visualization module
 * Add example notebook demonstrating the heatmap module and updated README.md
+* Fix monopartite batch assignment bug
 
 ## 0.1.1
 
