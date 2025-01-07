@@ -2,6 +2,7 @@ from typing import Any, Dict, Literal
 
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, collect_set
+from pyspark.sql.functions import max as spark_max
 
 
 def ingest_spark_dataframe(
@@ -66,10 +67,14 @@ def ingest_spark_dataframe(
         for batch_value in batch_list
     ]
 
+    num_groups = (
+        spark_dataframe.select(spark_max("group")).first()[0] + 1
+    )  # 0 indexed, so add 1
+
     # write batches serially to Neo4j database
     for batch in batches:
         (
-            batch.repartition("group")  # define parallel groups for ingest
+            batch.repartition(num_groups, "group")  # define parallel groups for ingest
             .write.mode(save_mode)
             .format("org.neo4j.spark.DataSource")
             .options(**options)

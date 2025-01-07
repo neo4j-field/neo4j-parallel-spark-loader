@@ -2,11 +2,16 @@
 
 ### Fixed
 
-* Fix monopartite batch assignment bug
-
 ### Changed
 
 ### Added
+
+## 0.2.1
+
+### Fixed
+
+* Fix monopartite batch assignment bug
+* Fix bug in ingest where partitioning was not performed according to defined groups
 
 ## 0.2.0
 
