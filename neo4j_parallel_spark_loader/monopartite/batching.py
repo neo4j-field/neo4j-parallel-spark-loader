@@ -109,7 +109,7 @@ def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
     # even number of nodes
     if n % 2 == 0:
         # Color even-distance edges
-        for start in range(n // 2):
+        for start in range((n-1) // 2):
             v1 = start
             v2 = start
             _step_through_edges(v1, v2, n // 2 + 1, current_color)

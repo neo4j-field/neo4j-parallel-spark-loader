@@ -13,6 +13,7 @@ def create_results_dataframe() -> pd.DataFrame:
             "row_count",
             "graph_structure",
             "load_time",
+            "process_time",
             "load_strategy",
             "num_groups",
         ]
@@ -29,6 +30,7 @@ def create_row(
     row_count: int,
     graph_structure: Literal["bipartite", "monopartite", "predefined_components"],
     load_time: float,
+    process_time: float,
     load_strategy: Literal["parallel", "serial"],
     num_groups: int,
 ) -> Dict[str, Any]:
@@ -36,6 +38,8 @@ def create_row(
         "row_count": row_count,
         "graph_structure": graph_structure,
         "load_time": load_time,
+        "process_time": process_time,
+        "total_time": load_time + process_time,
         "load_strategy": load_strategy,
         "num_groups": num_groups,
     }
@@ -50,7 +54,7 @@ def generate_benchmark_results(
 ) -> Dict[str, Any]:
     row_count = spark_dataframe.count()
     # if num_groups is not None:
-    load_time = timeit(lambda: ingest_function(spark_dataframe, num_groups), number=1)
+    proc_time, load_time = ingest_function(spark_dataframe, num_groups)
     # else:
     #     load_time = timeit(lambda: ingest_function(spark_dataframe), number=1)
 
@@ -59,6 +63,7 @@ def generate_benchmark_results(
         graph_structure=graph_structure,
         load_strategy=load_strategy,
         load_time=load_time,
+        process_time=proc_time,
         num_groups=num_groups or 1,
     )
 
