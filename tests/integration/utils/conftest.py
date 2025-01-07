@@ -8,11 +8,11 @@ from pyspark.sql import DataFrame, SparkSession
 def bipartite_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
     # bipartite example data
     data = [
-        {"source": "a", "target": "c", "prop": 0, "group": 0, "batch": 0},
-        {"source": "a", "target": "d", "prop": 1, "group": 0, "batch": 1},
-        {"source": "b", "target": "c", "prop": 2, "group": 1, "batch": 1},
-        {"source": "b", "target": "d", "prop": 3, "group": 1, "batch": 0},
-        {"source": "b", "target": "e", "prop": 4, "group": 0, "batch": 2},
+        {"source": "a", "target": "c", "prop": 0, "group": "a0", "batch": 0},
+        {"source": "a", "target": "d", "prop": 1, "group": "a0", "batch": 1},
+        {"source": "b", "target": "c", "prop": 2, "group": "b1", "batch": 1},
+        {"source": "b", "target": "d", "prop": 3, "group": "b1", "batch": 0},
+        {"source": "b", "target": "e", "prop": 4, "group": "a0", "batch": 2},
     ]
 
     return spark_fixture.createDataFrame(data)
