@@ -1,7 +1,7 @@
 from typing import Dict, List
 
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.functions import col, collect_list
 
 from neo4j_parallel_spark_loader.monopartite.batching import (
     color_complete_graph_with_self_loops,
@@ -58,3 +58,38 @@ def test_create_ingest_batches_from_groups(
 
     null_count = result.filter(col("batch").isNull()).count()
     assert null_count == 0
+
+
+def test_create_ingest_batches_from_groups_no_duplicate_group_rels(
+    spark_fixture: SparkSession, monopartite_dupe_batching_data: List[Dict[str, int]]
+) -> None:
+    sdf = spark_fixture.createDataFrame(
+        monopartite_dupe_batching_data 
+    )
+
+    result: DataFrame = create_ingest_batches_from_groups(spark_dataframe=sdf)
+
+    sources = result.select("source_node", "batch", "group").withColumnRenamed(
+        "source_node", "source_or_target"
+    )
+    targets = result.select("target_node", "batch", "group").withColumnRenamed(
+        "target_node", "source_or_target"
+    )
+    source_or_target = sources.union(targets)
+
+    group_counts = source_or_target.groupBy("group", "source_or_target").count().orderBy("source_or_target")
+
+    group_lists: DataFrame = group_counts.select("source_or_target", "group").groupBy("source_or_target").agg(collect_list("group"))
+
+    for row in group_lists.rdd.collect():
+        rels = []
+        for group in row["collect_list(group)"]:
+            r = (group[0], group[-1])
+            r_rev = (group[-1], group[0])
+
+            if r not in rels and r_rev not in rels:
+                rels.append(r)
+            else:
+                assert r not in rels and r_rev not in rels
+
+    # group_counts.show()
