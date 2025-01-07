@@ -70,9 +70,9 @@ if __name__ == "__main__":
     sdfs = {0: bp_sdf, 2: mp_sdf, 4: pc_sdf}
 
     SERIAL_GROUPS = [1]
-    BIPARTITE_GROUPS = [2, 3]
-    MONOPARTITE_GROUPS = [2, 5]
-    PREDEFINED_COMPONENTS_GROUPS = [2, 3]
+    BIPARTITE_GROUPS = [3, 5]
+    MONOPARTITE_GROUPS = [3, 5]
+    PREDEFINED_COMPONENTS_GROUPS = [3, 5]
 
     unsampled_tasks = [
         {
