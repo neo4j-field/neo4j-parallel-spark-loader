@@ -58,34 +58,52 @@ if __name__ == "__main__":
 
     sdfs = {0: bp_sdf, 2: mp_sdf, 4: pc_sdf}
 
+    SERIAL_GROUPS = [1]
+    BIPARTITE_GROUPS = [2, 3]
+    MONOPARTITE_GROUPS = [2, 5]
+    PREDEFINED_COMPONENTS_GROUPS = [2, 3]
+
     unsampled_tasks = [
-        {"graph_structure": "bipartite", "load_strategy": "serial", "num_groups": None},
-        {"graph_structure": "bipartite", "load_strategy": "parallel", "num_groups": 3},
+        {
+            "graph_structure": "bipartite",
+            "load_strategy": "serial",
+            "num_groups": SERIAL_GROUPS,
+        },
+        {
+            "graph_structure": "bipartite",
+            "load_strategy": "parallel",
+            "num_groups": BIPARTITE_GROUPS,
+        },
         {
             "graph_structure": "monopartite",
             "load_strategy": "serial",
-            "num_groups": None,
+            "num_groups": SERIAL_GROUPS,
         },
         {
             "graph_structure": "monopartite",
             "load_strategy": "parallel",
-            "num_groups": 5,
+            "num_groups": MONOPARTITE_GROUPS,
         },
         {
             "graph_structure": "predefined_components",
             "load_strategy": "serial",
-            "num_groups": None,
+            "num_groups": SERIAL_GROUPS,
         },
         {
             "graph_structure": "predefined_components",
             "load_strategy": "parallel",
-            "num_groups": 3,
+            "num_groups": PREDEFINED_COMPONENTS_GROUPS,
         },
     ]
 
+    # init new dataframe
     results_df = create_results_dataframe()
 
+    # mark benchmarking start time
     ts = str(datetime.now())
+
+    # wait for database to be online before running
+    healthcheck(neo4j_driver=neo4j_driver)
 
     for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
         print(unsampled_tasks[idx].get("graph_structure"))
@@ -93,7 +111,7 @@ if __name__ == "__main__":
             sampled_sdf = sdfs.get(idx).sample(s)
 
             # create constraints
-            # create_constraints(spark_session=spark_session)
+            create_constraints(neo4j_driver=neo4j_driver)
 
             graph_structure = unsampled_tasks[idx].get("graph_structure")
 
@@ -104,42 +122,50 @@ if __name__ == "__main__":
             # load relationships
             load_strategy = unsampled_tasks[idx].get("load_strategy")
             num_groups = unsampled_tasks[idx].get("num_groups")
+
             # idx
-            results_row = generate_benchmark_results(
-                spark_dataframe=sampled_sdf,
-                graph_structure=graph_structure,
-                ingest_function=ingest_functions.get(graph_structure).get(
-                    load_strategy
-                ),
-                load_strategy=load_strategy,
-                num_groups=num_groups if load_strategy == "parallel" else None,
-            )
-            results_df = append_results_to_dataframe(results_df, results_row)
+            for n in tqdm(num_groups, desc="groups"):
+                results_row = generate_benchmark_results(
+                    spark_dataframe=sampled_sdf,
+                    graph_structure=graph_structure,
+                    ingest_function=ingest_functions.get(graph_structure).get(
+                        load_strategy
+                    ),
+                    load_strategy=load_strategy,
+                    num_groups=n,
+                )
+                results_df = append_results_to_dataframe(results_df, results_row)
 
-            save_dataframe(results_df, ts)
+                save_dataframe(results_df, ts)
 
-            # clean up relationships
-            delete_relationships(spark_session=spark_session)
+                # clean up relationships
+                delete_relationships(spark_session=spark_session)
 
             # idx + 1
             load_strategy = unsampled_tasks[idx + 1].get("load_strategy")
             num_groups = unsampled_tasks[idx + 1].get("num_groups")
-            results_row = generate_benchmark_results(
-                spark_dataframe=sampled_sdf,
-                graph_structure=graph_structure,
-                ingest_function=ingest_functions.get(graph_structure).get(
-                    load_strategy
-                ),
-                load_strategy=load_strategy,
-                num_groups=num_groups if load_strategy == "parallel" else None,
-            )
-            results_df = append_results_to_dataframe(results_df, results_row)
 
-            save_dataframe(results_df, ts)
+            for n in tqdm(num_groups, desc="groups"):
+                results_row = generate_benchmark_results(
+                    spark_dataframe=sampled_sdf,
+                    graph_structure=graph_structure,
+                    ingest_function=ingest_functions.get(graph_structure).get(
+                        load_strategy
+                    ),
+                    load_strategy=load_strategy,
+                    num_groups=n,
+                )
+                results_df = append_results_to_dataframe(results_df, results_row)
+
+                save_dataframe(results_df, ts)
+
+                # clean up relationships
+                delete_relationships(spark_session=spark_session)
 
             # refresh database
             restore_database(neo4j_driver=neo4j_driver)
 
+            # wait for database to restore
             healthcheck(neo4j_driver=neo4j_driver)
 
     neo4j_driver.close()

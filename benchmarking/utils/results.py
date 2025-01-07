@@ -49,12 +49,10 @@ def generate_benchmark_results(
     num_groups: Optional[int] = None,
 ) -> Dict[str, Any]:
     row_count = spark_dataframe.count()
-    if num_groups is not None:
-        load_time = timeit(
-            lambda: ingest_function(spark_dataframe, num_groups), number=1
-        )
-    else:
-        load_time = timeit(lambda: ingest_function(spark_dataframe), number=1)
+    # if num_groups is not None:
+    load_time = timeit(lambda: ingest_function(spark_dataframe, num_groups), number=1)
+    # else:
+    #     load_time = timeit(lambda: ingest_function(spark_dataframe), number=1)
 
     return create_row(
         row_count=row_count,

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from neo4j import Driver
 from pyspark.sql import DataFrame, SparkSession
 
@@ -10,26 +12,19 @@ from neo4j_parallel_spark_loader import (
 )
 
 
-def create_constraints(spark_session: SparkSession) -> None:
-    df: DataFrame = spark_session.createDataFrame([{"value": 0}])
+def create_constraints(neo4j_driver: Driver) -> None:
+    queries = [
+        "create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;",
+        "create constraint node_b_constraint if not exists for (n:NodeB) require n.id is node key;",
+    ]
 
-    query = """
-create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;
-create constraint node_b_constraint if not exists for (n:NodeB) require n.id is node key;
-"""
-    df.write.format("org.neo4j.spark.DataSource").mode("Overwrite").option(
-        "query", query
-    ).save()
+    with neo4j_driver.session() as session:
+        [session.run(q) for q in queries]
 
 
 def load_bipartite_nodes(spark_dataframe: DataFrame) -> None:
     node_a = spark_dataframe.select("source").distinct()
     node_b = spark_dataframe.select("target").distinct()
-
-    constraints_query = """
-create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;
-create constraint node_b_constraint if not exists for (n:NodeB) require n.id is node key;
-"""
 
     query_a = """
 MERGE (:NodeA {id: event.source})
@@ -42,7 +37,6 @@ MERGE (:NodeB {id: event.target})
         node_a.write.format("org.neo4j.spark.DataSource")
         .mode("Overwrite")
         .option("query", query_a)
-        .option("script", constraints_query)
         .save()
     )
 
@@ -66,10 +60,6 @@ def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
         )
     )
 
-    constraints_query = """
-create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;
-"""
-
     query_a = """
 MERGE (:NodeA {id: event.id})
 """
@@ -78,12 +68,13 @@ MERGE (:NodeA {id: event.id})
         node_a.write.format("org.neo4j.spark.DataSource")
         .mode("Overwrite")
         .option("query", query_a)
-        .option("script", constraints_query)
         .save()
     )
 
 
-def load_bipartite_relationships_in_serial(spark_dataframe: DataFrame) -> None:
+def load_bipartite_relationships_in_serial(
+    spark_dataframe: DataFrame, num_groups: Optional[int] = None
+) -> None:
     query = """
 MATCH (source:NodeA {id: event.source})
 MATCH (target:NodeB {id: event.target})
@@ -99,7 +90,9 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
     )
 
 
-def load_monopartite_relationships_in_serial(spark_dataframe: DataFrame) -> None:
+def load_monopartite_relationships_in_serial(
+    spark_dataframe: DataFrame, num_groups: Optional[int] = None
+) -> None:
     query = """
 MATCH (source:NodeA {id: event.source})
 MATCH (target:NodeA {id: event.target})

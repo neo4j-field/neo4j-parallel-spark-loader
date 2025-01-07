@@ -5,7 +5,7 @@ from neo4j.exceptions import DatabaseError
 
 
 def healthcheck(neo4j_driver: Driver):
-    """Confirm that Neo4j is running before running IT."""
+    """Confirm that Neo4j is running before continuing."""
 
     attempts = 0
     success = False
