@@ -66,14 +66,14 @@ def generate_benchmark_results(
 
 
 def _get_package_version() -> str:
-    with open("../pyproject.toml", "r") as f:
+    with open("./pyproject.toml", "r") as f:
         config = toml.load(f)
         return config["tool"]["poetry"]["version"]
 
 
 def save_dataframe(dataframe: pd.DataFrame, ts: str) -> None:
     version = "v" + _get_package_version()
-    path = f"output/{version}"
+    path = f"benchmarking/output/{version}"
 
     if not os.path.exists(path):
         os.makedirs(path)

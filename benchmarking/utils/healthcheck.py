@@ -9,7 +9,7 @@ def healthcheck(neo4j_driver: Driver):
 
     attempts = 0
     success = False
-    print("\nWaiting for Neo4j to Start...\n")
+    # print("\nWaiting for Neo4j to Start...\n")
     time.sleep(3)
     while not success or attempts > 3:
         try:
@@ -18,9 +18,9 @@ def healthcheck(neo4j_driver: Driver):
             success = True
         except Exception:
             attempts += 1
-            print(
-                f"failed connection {attempts} | waiting {(1 + attempts) * 2} seconds..."
-            )
+            # print(
+            #     f"failed connection {attempts} | waiting {(1 + attempts) * 2} seconds..."
+            # )
             time.sleep((1 + attempts) * 2)
     if not success:
         raise DatabaseError()

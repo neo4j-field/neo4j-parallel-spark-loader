@@ -3,6 +3,11 @@
 # Default target executed when no arguments are given to make.
 all: help
 
+benchmark:
+	docker compose -f benchmarking/docker-compose.yml up -d	
+	poetry run python3 benchmarking/main.py
+	docker compose -f benchmarking/docker-compose.yml stop
+
 coverage:
 	poetry run coverage run -m pytest tests/unit
 	poetry run coverage report --fail-under=85
