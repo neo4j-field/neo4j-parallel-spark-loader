@@ -1,6 +1,7 @@
 from typing import Dict, Tuple
 
 from pyspark.sql import DataFrame, SparkSession
+from pyspark.sql.functions import col
 
 
 def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
@@ -37,6 +38,17 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     coloring_df = spark.createDataFrame(
         coloring_data, ["source_group", "target_group", "batch"]
     )
+
+    reverse_coloring_df = (coloring_df
+                           .filter(col("source_group") != col("target_group"))
+                           .select(
+                               col("target_group").alias("source_group"),
+                               col("source_group").alias("target_group"),
+                               col("batch"))
+    )
+
+    coloring_df = coloring_df.union(reverse_coloring_df)
+
 
     # Join the DataFrames
     result_df = spark_dataframe.join(
@@ -86,8 +98,12 @@ def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
         for i in range(number_of_steps):
             vertex1 = (v1 - i) % n
             vertex2 = (v2 + i) % n
-            if (min(vertex1, vertex2), max(vertex1, vertex2)) not in edge_colors:
-                _add_edge_color(vertex1, vertex2, color)
+            if vertex1 < vertex2:
+                min_vertex, max_vertex = vertex1, vertex2
+            else:
+                min_vertex, max_vertex = vertex2, vertex1
+            if (min_vertex, max_vertex) not in edge_colors:
+                _add_edge_color(min_vertex, max_vertex, color)
             # else:
             #     print(f"{min(vertex1, vertex2), max(vertex1, vertex2)} is already colored")
 

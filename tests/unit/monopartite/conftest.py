@@ -18,7 +18,7 @@ def monopartite_batching_data() -> List[Dict[str, int]]:
 def monopartite_grouping_data() -> List[Dict[str, int]]:
     return [
         {"source_node": 1, "target_node": 3},
-        {"source_node": 2, "target_node": 4},
+        {"source_node": 4, "target_node": 2},
         {"source_node": 3, "target_node": 5},
         {"source_node": 4, "target_node": 6},
         {"source_node": 0, "target_node": 0},
