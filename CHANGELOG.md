@@ -2,6 +2,8 @@
 
 ### Fixed
 
+* update how `num_groups` in ingest function is calculated internally 
+
 ### Changed
 
 ### Added
