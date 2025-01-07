@@ -27,6 +27,13 @@ def load_data_into_spark_dataframe(
 
     return spark_session.read.option("header", True).csv(file_path)
 
+def sample_spark_dataframe(spark_dataframe: DataFrame, desired_number: int) -> DataFrame:
+    """Work-around for Spark's inaccurate sampling method."""
+    
+    fraction = desired_number / spark_dataframe.count() * 1.2
+
+    return spark_dataframe.sample(False, fraction, seed=42).limit(desired_number)
+
 
 if __name__ == "__main__":
     spark_session: SparkSession = create_spark_session()
@@ -54,7 +61,8 @@ if __name__ == "__main__":
         },
     }
 
-    sample_fractions = [0.0001, 0.001, 0.01, 0.1, 1.0]
+    # sample_fractions = [0.0001, 0.001, 0.01, 0.1, 1.0]
+    sample_sizes = [10, 100, 1_000, 10_000, 100_000]
 
     sdfs = {0: bp_sdf, 2: mp_sdf, 4: pc_sdf}
 
@@ -107,8 +115,9 @@ if __name__ == "__main__":
 
     for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
         print(unsampled_tasks[idx].get("graph_structure"))
-        for s in tqdm(sample_fractions, desc="sample sizes"):
-            sampled_sdf = sdfs.get(idx).sample(s)
+        for s in tqdm(sample_sizes, desc="sample sizes"):
+            # sampled_sdf = sdfs.get(idx).sample(s)
+            sampled_sdf: DataFrame = sample_spark_dataframe(sdfs.get(idx), s)
 
             # create constraints
             create_constraints(neo4j_driver=neo4j_driver)
