@@ -2,11 +2,15 @@
 
 ### Fixed
 
-* update how `num_groups` in ingest function is calculated internally 
-
 ### Changed
 
 ### Added
+
+## 0.2.2
+
+### Fixed
+
+* update how `num_groups` in ingest function is calculated internally 
 
 ## 0.2.1
 
