@@ -1,7 +1,7 @@
 from pyspark.sql import DataFrame
+from pyspark.sql.functions import lit, least, greatest, concat, col
 
 from ..utils.grouping import (
-    create_group_column_from_source_and_target_groups,
     create_value_groupings,
 )
 from ..utils.verify_spark import verify_spark_version
@@ -63,7 +63,14 @@ def create_node_groupings(
 
     final_sdf = final_sdf.drop("value")
 
-    final_sdf = create_group_column_from_source_and_target_groups(final_sdf)
+    final_sdf = final_sdf.withColumn(
+        "group",
+        concat(
+            least("source_group", "target_group"),
+            lit(" -- "),
+            greatest("source_group", "target_group"),
+        ),
+    )
 
     return final_sdf
 

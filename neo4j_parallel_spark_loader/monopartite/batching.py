@@ -32,34 +32,16 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
 
     coloring = color_complete_graph_with_self_loops(group_count)
 
-    coloring_data = [(k[0], k[1], v) for k, v in coloring.items()]
+    coloring_data = [(f"{k[0]}--{k[1]}", v) for k, v in coloring.items()]
 
     # Create a DataFrame from the coloring dictionary
-    coloring_df = spark.createDataFrame(
-        coloring_data, ["source_group", "target_group", "batch"]
-    )
-
-    reverse_coloring_df = coloring_df.filter(
-        col("source_group") != col("target_group")
-    ).select(
-        col("target_group").alias("source_group"),
-        col("source_group").alias("target_group"),
-        col("batch"),
-    )
-
-    coloring_df = coloring_df.union(reverse_coloring_df)
+    coloring_df = spark.createDataFrame(coloring_data, ["group", "batch"])
 
     # Join the DataFrames
     result_df = spark_dataframe.join(
         other=coloring_df,
-        on=(spark_dataframe.source_group == coloring_df.source_group)
-        & (spark_dataframe.target_group == coloring_df.target_group),
+        on=(spark_dataframe.group == coloring_df.group),
         how="left",  # Use left join to keep all records from spark_dataframe
-    ).drop(
-        coloring_df.source_group,
-        coloring_df.target_group,
-        spark_dataframe.source_group,
-        spark_dataframe.target_group,
     )
 
     return result_df

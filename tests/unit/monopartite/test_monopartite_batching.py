@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col, collect_list
+from pyspark.sql.functions import col, collect_list, countDistinct, max
 
 from neo4j_parallel_spark_loader.monopartite.batching import (
     color_complete_graph_with_self_loops,
@@ -51,7 +51,7 @@ def test_create_ingest_batches_from_groups(
     spark_fixture: SparkSession, monopartite_batching_data: List[Dict[str, int]]
 ) -> None:
     sdf = spark_fixture.createDataFrame(
-        monopartite_batching_data, ["source_group", "target_group"]
+        monopartite_batching_data, ["group"]
     )
 
     result = create_ingest_batches_from_groups(spark_dataframe=sdf)
@@ -77,19 +77,11 @@ def test_create_ingest_batches_from_groups_no_duplicate_group_rels(
     )
     source_or_target = sources.union(targets)
 
-    group_counts = source_or_target.groupBy("group", "source_or_target").count().orderBy("source_or_target")
+    # Within a batch, a single source_or_target_value should be associated with at most 1 group.
+    max_batch_st_group_count = (source_or_target.groupBy("source_or_target", "batch")
+                                .agg(countDistinct("group").alias("distinct_count"))
+                                .agg(max("distinct_count").alias("max_distinct_count"))
+                                .collect())[0]["max_distinct_count"]
+    
+    assert max_batch_st_group_count == 1
 
-    group_lists: DataFrame = group_counts.select("source_or_target", "group").groupBy("source_or_target").agg(collect_list("group"))
-
-    for row in group_lists.rdd.collect():
-        rels = []
-        for group in row["collect_list(group)"]:
-            r = (group[0], group[-1])
-            r_rev = (group[-1], group[0])
-
-            if r not in rels and r_rev not in rels:
-                rels.append(r)
-            else:
-                assert r not in rels and r_rev not in rels
-
-    # group_counts.show()
