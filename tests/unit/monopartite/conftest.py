@@ -6,11 +6,11 @@ import pytest
 @pytest.fixture(scope="module")
 def monopartite_batching_data() -> List[Dict[str, int]]:
     return [
-        {"group": "1--3"},
-        {"group": "2--4"},
-        {"group": "3--5"},
-        {"group": "4--6"},
-        {"group": "0--0"},
+        {"group": "1--3", "source_group": 1, "target_group": 3},
+        {"group": "2--4", "source_group": 2, "target_group": 4},
+        {"group": "3--5", "source_group": 5, "target_group": 3},
+        {"group": "4--6", "source_group": 6, "target_group": 4},
+        {"group": "0--0", "source_group": 0, "target_group": 0},
     ]
 
 @pytest.fixture(scope="module")

@@ -42,7 +42,7 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
         other=coloring_df,
         on=(spark_dataframe.group == coloring_df.group),
         how="left",  # Use left join to keep all records from spark_dataframe
-    )
+    ).drop(coloring_df.group)
 
     return result_df
 
@@ -94,7 +94,7 @@ def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
         for start in range(n // 2):
             v1 = start
             v2 = start
-            _step_through_edges(v1, v2, n // 2 + 1, current_color)
+            _step_through_edges(v1, v2, (n // 2) + 1, current_color)
             current_color += 1
         # Color odd-distance edges
         for start in range(n // 2):
@@ -108,7 +108,7 @@ def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
         for start in range(n):
             v1 = start
             v2 = start
-            _step_through_edges(v1, v2, n // 2 + 1, current_color)
+            _step_through_edges(v1, v2, (n + 1) // 2, current_color)
             current_color += 1
 
     return edge_colors

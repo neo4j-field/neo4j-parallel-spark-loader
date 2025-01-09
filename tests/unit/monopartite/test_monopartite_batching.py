@@ -22,9 +22,9 @@ def test_color_complete_graph_with_self_loops_with_even_vertices() -> None:
 
 def test_color_complete_graph_with_self_loops_with_odd_vertices() -> None:
     result = color_complete_graph_with_self_loops(3)
-
+    
     assert len(result) == 6
-    assert max([v for _, v in result.items()]) == 2
+    assert set([v for _, v in result.items()]) == {0, 1, 2}
 
 
 def test_color_complete_graph_with_self_loops_with_ten_vertices() -> None:
@@ -75,7 +75,9 @@ def test_create_ingest_batches_from_groups_no_duplicate_group_rels(
     targets = result.select("target_node", "batch", "group").withColumnRenamed(
         "target_node", "source_or_target"
     )
-    source_or_target = sources.union(targets)
+    source_or_target = sources.unionAll(targets)
+
+    print(source_or_target.show())
 
     # Within a batch, a single source_or_target_value should be associated with at most 1 group.
     max_batch_st_group_count = (source_or_target.groupBy("source_or_target", "batch")
