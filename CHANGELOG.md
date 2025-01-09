@@ -2,9 +2,15 @@
 
 ### Fixed
 
-* Fixed monopartite batching color coding process where sometimes a property value would be found in conflicting groups
-
 ### Changed
+
+### Added
+
+## 0.2.3
+
+### Fixed
+
+* Fixed monopartite batching color coding process where sometimes a property value would be found in conflicting groups
 
 ### Added
 
