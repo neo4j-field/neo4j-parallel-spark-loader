@@ -35,12 +35,12 @@ def sample_spark_dataframe(
 
     # if desired_number == spark_dataframe.count():
     #     return spark_dataframe
-    
+
     fraction = min(desired_number / spark_dataframe.count() * 1.1, 1.0)
 
     if fraction == 1.0:
         return spark_dataframe
-    
+
     return spark_dataframe.sample(False, fraction, seed=42).limit(desired_number)
 
 

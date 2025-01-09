@@ -8,8 +8,9 @@ from matplotlib.axes import Axes
 TIME_LABELS = {
     "load_time": "Load Time (s)",
     "process_time": "Preprocess Time (s)",
-    "total_time": "Total Time (s)"
+    "total_time": "Total Time (s)",
 }
+
 
 def create_row_count_v_time_line_plot(dataframe: pd.DataFrame) -> Axes:
     sns.set_theme()
@@ -66,7 +67,7 @@ def create_num_groups_v_time_line_plot(dataframe: pd.DataFrame, time_col: str) -
     lines_labels = [ax.get_legend_handles_labels() for ax in fig.axes]
     [ax.get_legend().remove() for ax in fig.axes]
     # print(lines_labels)
-    
+
     # lines, labels = [sum(lol, []) for lol in zip(*lines_labels)]
     lines, labels = deduplicate_lines_and_labels(lines_labels)
     # print(lines)
@@ -78,7 +79,9 @@ def create_num_groups_v_time_line_plot(dataframe: pd.DataFrame, time_col: str) -
     return axes
 
 
-def deduplicate_lines_and_labels(lines_and_labels: List[Tuple[Any, float]]) -> Tuple[List[Any]]:
+def deduplicate_lines_and_labels(
+    lines_and_labels: List[Tuple[Any, float]],
+) -> Tuple[List[Any]]:
     final_labels: List[str] = []
     final_lines: List[str] = []
 
@@ -87,8 +90,9 @@ def deduplicate_lines_and_labels(lines_and_labels: List[Tuple[Any, float]]) -> T
             if labels[idx] not in final_labels:
                 final_labels.append(labels[idx])
                 final_lines.append(lines[idx])
-    
+
     return (final_lines, final_labels)
+
 
 def create_preprocess_v_load_time_chart(dataframe: pd.DataFrame) -> Axes:
     sns.set_theme()
@@ -104,5 +108,3 @@ def create_preprocess_v_load_time_chart(dataframe: pd.DataFrame) -> Axes:
     ax.set_title("Serial vs. Parallel Ingest Load & Preprocessing Times")
     sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
     return ax
-
-        
