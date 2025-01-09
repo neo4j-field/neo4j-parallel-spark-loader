@@ -42,9 +42,11 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
         other=coloring_df,
         on=(spark_dataframe.group == coloring_df.group),
         how="left",  # Use left join to keep all records from spark_dataframe
-    ).drop(coloring_df.group,
-           spark_dataframe.source_group,
-           spark_dataframe.target_group,)
+    ).drop(
+        coloring_df.group,
+        spark_dataframe.source_group,
+        spark_dataframe.target_group,
+    )
 
     return result_df
 
@@ -87,8 +89,6 @@ def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
                 min_vertex, max_vertex = vertex2, vertex1
             if (min_vertex, max_vertex) not in edge_colors:
                 _add_edge_color(min_vertex, max_vertex, color)
-            # else:
-            #     print(f"{min(vertex1, vertex2), max(vertex1, vertex2)} is already colored")
 
     # even number of nodes
     if n % 2 == 0:

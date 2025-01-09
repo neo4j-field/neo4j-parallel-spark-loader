@@ -1,5 +1,5 @@
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import lit, least, greatest, concat, col
+from pyspark.sql.functions import col, concat, greatest, least, lit
 
 from ..utils.grouping import (
     create_value_groupings,

@@ -22,7 +22,7 @@ def test_color_complete_graph_with_self_loops_with_even_vertices() -> None:
 
 def test_color_complete_graph_with_self_loops_with_odd_vertices() -> None:
     result = color_complete_graph_with_self_loops(3)
-    
+
     assert len(result) == 6
     assert set([v for _, v in result.items()]) == {0, 1, 2}
 
@@ -50,9 +50,7 @@ def test_color_complete_graph_with_self_loops_with_ten_vertices() -> None:
 def test_create_ingest_batches_from_groups(
     spark_fixture: SparkSession, monopartite_batching_data: List[Dict[str, int]]
 ) -> None:
-    sdf = spark_fixture.createDataFrame(
-        monopartite_batching_data, ["group"]
-    )
+    sdf = spark_fixture.createDataFrame(monopartite_batching_data, ["group"])
 
     result = create_ingest_batches_from_groups(spark_dataframe=sdf)
 
@@ -63,21 +61,24 @@ def test_create_ingest_batches_from_groups(
 def test_create_ingest_batches_from_groups_no_duplicate_group_rels(
     spark_fixture: SparkSession, monopartite_dupe_batching_data: List[Dict[str, int]]
 ) -> None:
-    sdf = spark_fixture.createDataFrame(
-        monopartite_dupe_batching_data 
-    )
+    sdf = spark_fixture.createDataFrame(monopartite_dupe_batching_data)
 
     result: DataFrame = create_ingest_batches_from_groups(spark_dataframe=sdf)
 
-    sources = result.select("batch", "group").withColumn("source_or_target", col("group").substr(1, 1))
-    targets = result.select("batch", "group").withColumn("source_or_target", col("group").substr(-1, 1))
+    sources = result.select("batch", "group").withColumn(
+        "source_or_target", col("group").substr(1, 1)
+    )
+    targets = result.select("batch", "group").withColumn(
+        "source_or_target", col("group").substr(-1, 1)
+    )
     source_or_target = sources.unionAll(targets)
 
     # Within a batch, a single source_or_target_value should be associated with at most 1 group.
-    max_batch_st_group_count = (source_or_target.groupBy("source_or_target", "batch")
-                                .agg(countDistinct("group").alias("distinct_count"))
-                                .agg(max("distinct_count").alias("max_distinct_count"))
-                                .collect())[0]["max_distinct_count"]
-    
-    assert max_batch_st_group_count == 1
+    max_batch_st_group_count = (
+        source_or_target.groupBy("source_or_target", "batch")
+        .agg(countDistinct("group").alias("distinct_count"))
+        .agg(max("distinct_count").alias("max_distinct_count"))
+        .collect()
+    )[0]["max_distinct_count"]
 
+    assert max_batch_st_group_count == 1
