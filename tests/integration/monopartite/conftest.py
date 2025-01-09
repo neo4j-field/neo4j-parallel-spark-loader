@@ -1,4 +1,5 @@
 from random import randint
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
@@ -29,3 +30,13 @@ def generate_unpartitioned_dataframe(num_rows: int, alpha: float) -> pd.DataFram
 @pytest.fixture(scope="function")
 def input_spark_dataframe() -> DataFrame:
     data = generate_unpartitioned_dataframe(10_000, 2.0)
+
+@pytest.fixture(scope="module")
+def monopartite_batching_data() -> List[Dict[str, int]]:
+    return [
+        {"group": "1--3", "source_group": 1, "target_group": 3},
+        {"group": "2--4", "source_group": 2, "target_group": 4},
+        {"group": "3--5", "source_group": 5, "target_group": 3},
+        {"group": "4--6", "source_group": 6, "target_group": 4},
+        {"group": "0--0", "source_group": 0, "target_group": 0},
+    ]

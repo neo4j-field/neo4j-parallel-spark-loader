@@ -73,8 +73,6 @@ def test_create_ingest_batches_from_groups_no_duplicate_group_rels(
     targets = result.select("batch", "group").withColumn("source_or_target", col("group").substr(-1, 1))
     source_or_target = sources.unionAll(targets)
 
-    print(source_or_target.show())
-
     # Within a batch, a single source_or_target_value should be associated with at most 1 group.
     max_batch_st_group_count = (source_or_target.groupBy("source_or_target", "batch")
                                 .agg(countDistinct("group").alias("distinct_count"))
