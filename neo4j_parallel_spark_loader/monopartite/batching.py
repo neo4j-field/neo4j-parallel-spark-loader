@@ -42,7 +42,9 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
         other=coloring_df,
         on=(spark_dataframe.group == coloring_df.group),
         how="left",  # Use left join to keep all records from spark_dataframe
-    ).drop(coloring_df.group)
+    ).drop(coloring_df.group,
+           spark_dataframe.source_group,
+           spark_dataframe.target_group,)
 
     return result_df
 

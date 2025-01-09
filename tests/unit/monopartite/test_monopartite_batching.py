@@ -69,12 +69,8 @@ def test_create_ingest_batches_from_groups_no_duplicate_group_rels(
 
     result: DataFrame = create_ingest_batches_from_groups(spark_dataframe=sdf)
 
-    sources = result.select("source_node", "batch", "group").withColumnRenamed(
-        "source_node", "source_or_target"
-    )
-    targets = result.select("target_node", "batch", "group").withColumnRenamed(
-        "target_node", "source_or_target"
-    )
+    sources = result.select("batch", "group").withColumn("source_or_target", col("group").substr(1, 1))
+    targets = result.select("batch", "group").withColumn("source_or_target", col("group").substr(-1, 1))
     source_or_target = sources.unionAll(targets)
 
     print(source_or_target.show())
