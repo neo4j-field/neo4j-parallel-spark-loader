@@ -6,6 +6,22 @@
 
 ### Added
 
+## 0.2.4
+
+### Fixed
+
+* Fixed delimiter in generated group ID to be consistent between group and batch processes in monopartite
+
+## 0.2.3
+
+### Fixed
+
+* Fixed monopartite batching color coding process where sometimes a property value would be found in conflicting groups
+
+### Added
+
+* Added additional tests for monopartite batching 
+
 ## 0.2.2
 
 ### Fixed
