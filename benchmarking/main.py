@@ -25,7 +25,7 @@ def load_data_into_spark_dataframe(
 ) -> DataFrame:
     file_path = f"benchmarking/data/{category}_data.csv"
 
-    return spark_session.read.option("header", True).csv(file_path).drop_duplicates()
+    return spark_session.read.option("header", True).csv(file_path)
 
 
 def sample_spark_dataframe(
@@ -33,11 +33,14 @@ def sample_spark_dataframe(
 ) -> DataFrame:
     """Work-around for Spark's inaccurate sampling method."""
 
-    if desired_number == spark_dataframe.count():
-        return spark_dataframe
+    # if desired_number == spark_dataframe.count():
+    #     return spark_dataframe
     
     fraction = min(desired_number / spark_dataframe.count() * 1.1, 1.0)
 
+    if fraction == 1.0:
+        return spark_dataframe
+    
     return spark_dataframe.sample(False, fraction, seed=42).limit(desired_number)
 
 
