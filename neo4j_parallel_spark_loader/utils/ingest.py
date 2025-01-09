@@ -67,9 +67,7 @@ def ingest_spark_dataframe(
         for batch_value in batch_list
     ]
 
-    num_groups = (
-        spark_dataframe.select("group").distinct().count()
-    ) 
+    num_groups = spark_dataframe.select("group").distinct().count()
 
     # write batches serially to Neo4j database
     for batch in batches:
