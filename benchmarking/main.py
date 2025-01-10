@@ -1,6 +1,6 @@
 import warnings
 from datetime import datetime
-from typing import Literal
+from typing import Any, Dict, Literal
 
 from pyspark.sql import DataFrame, SparkSession
 from tqdm import tqdm
@@ -12,36 +12,18 @@ from benchmarking.utils.results import (
     append_results_to_dataframe,
     create_results_dataframe,
     generate_benchmark_results,
+    get_package_version,
     save_dataframe,
 )
-from benchmarking.utils.spark import create_spark_session
+from benchmarking.utils.spark import (
+    create_spark_session,
+    get_current_spark_num_workers,
+    get_spark_details,
+    load_data_into_spark_dataframe,
+    sample_spark_dataframe,
+)
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-
-
-def load_data_into_spark_dataframe(
-    spark_session: SparkSession,
-    category: Literal["bipartite", "monopartite", "predefined_components"],
-) -> DataFrame:
-    file_path = f"benchmarking/data/{category}_data.csv"
-
-    return spark_session.read.option("header", True).csv(file_path)
-
-
-def sample_spark_dataframe(
-    spark_dataframe: DataFrame, desired_number: int
-) -> DataFrame:
-    """Work-around for Spark's inaccurate sampling method."""
-
-    if desired_number == spark_dataframe.count():
-        return spark_dataframe
-
-    fraction = min(desired_number / spark_dataframe.count() * 1.1, 1.0)
-
-    if fraction == 1.0:
-        return spark_dataframe
-
-    return spark_dataframe.sample(False, fraction, seed=42).limit(desired_number)
 
 
 if __name__ == "__main__":
@@ -51,6 +33,9 @@ if __name__ == "__main__":
     bp_sdf = load_data_into_spark_dataframe(spark_session, "bipartite")
     mp_sdf = load_data_into_spark_dataframe(spark_session, "monopartite")
     pc_sdf = load_data_into_spark_dataframe(spark_session, "predefined_components")
+
+    static_cols: Dict[str, Any] = get_spark_details(spark_session=spark_session)
+    static_cols.update({"neo4j_parallel_spark_loader_version": get_package_version()})
 
     ingest_functions = {
         "bipartite": {
@@ -122,14 +107,13 @@ if __name__ == "__main__":
     # wait for database to be online before running
     healthcheck(neo4j_driver=neo4j_driver)
 
-    for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
-    # for idx in range(0, len(unsampled_tasks), 2):
+    # for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
+    for idx in range(0, len(unsampled_tasks), 2):
         print(unsampled_tasks[idx].get("graph_structure"))
-        for s in tqdm(sample_sizes, desc="sample sizes"):
-        # for s in sample_sizes:
-            # sampled_sdf = sdfs.get(idx).sample(s)
+        # for s in tqdm(sample_sizes, desc="sample sizes"):
+        for s in sample_sizes:
             sampled_sdf: DataFrame = sample_spark_dataframe(sdfs.get(idx), s)
-            print("sampled df count: ", sampled_sdf.count())
+            # print("sampled df count: ", sampled_sdf.count())
             # create constraints
             create_constraints(neo4j_driver=neo4j_driver)
 
@@ -144,8 +128,8 @@ if __name__ == "__main__":
             num_groups = unsampled_tasks[idx].get("num_groups")
 
             # idx
-            for n in tqdm(num_groups, desc="groups"):
-            # for n in num_groups:
+            # for n in tqdm(num_groups, desc="groups"):
+            for n in num_groups:
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -154,7 +138,12 @@ if __name__ == "__main__":
                     ),
                     load_strategy=load_strategy,
                     num_groups=n,
+                    static_columns=static_cols
                 )
+                # print(
+                #     "NUM WORKERS: ",
+                #     get_current_spark_num_workers(spark_session=spark_session),
+                # )
                 results_df = append_results_to_dataframe(results_df, results_row)
 
                 save_dataframe(results_df, ts)
@@ -166,7 +155,8 @@ if __name__ == "__main__":
             load_strategy = unsampled_tasks[idx + 1].get("load_strategy")
             num_groups = unsampled_tasks[idx + 1].get("num_groups")
 
-            for n in tqdm(num_groups, desc="groups"):
+            # for n in tqdm(num_groups, desc="groups"):
+            for n in num_groups:
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -175,6 +165,7 @@ if __name__ == "__main__":
                     ),
                     load_strategy=load_strategy,
                     num_groups=n,
+                    static_columns=static_cols
                 )
                 results_df = append_results_to_dataframe(results_df, results_row)
 

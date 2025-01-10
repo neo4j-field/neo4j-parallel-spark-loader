@@ -16,6 +16,9 @@ def create_results_dataframe() -> pd.DataFrame:
             "process_time",
             "load_strategy",
             "num_groups",
+            "available_cpus_per_node",
+            "spark.jars.packages",
+            "neo4j_parallel_spark_loader_version",
         ]
     )
 
@@ -33,6 +36,7 @@ def create_row(
     process_time: float,
     load_strategy: Literal["parallel", "serial"],
     num_groups: int,
+    static_columns: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
     return {
         "row_count": row_count,
@@ -42,6 +46,11 @@ def create_row(
         "total_time": load_time + process_time,
         "load_strategy": load_strategy,
         "num_groups": num_groups,
+        "available_cpus_per_node": static_columns.get("available_cpus_per_node"),
+        "spark.jars.packages": static_columns.get("spark.jars.packages"),
+        "neo4j_parallel_spark_loader_version": static_columns.get(
+            "neo4j_parallel_spark_loader_version"
+        ),
     }
 
 
@@ -51,12 +60,10 @@ def generate_benchmark_results(
     graph_structure: Literal["bipartite", "monopartite", "predefined_components"],
     load_strategy: Literal["parallel", "serial"],
     num_groups: Optional[int] = None,
+    static_columns: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
     row_count = spark_dataframe.count()
-    # if num_groups is not None:
     proc_time, load_time = ingest_function(spark_dataframe, num_groups)
-    # else:
-    #     load_time = timeit(lambda: ingest_function(spark_dataframe), number=1)
 
     return create_row(
         row_count=row_count,
@@ -65,17 +72,18 @@ def generate_benchmark_results(
         load_time=load_time,
         process_time=proc_time,
         num_groups=num_groups or 1,
+        static_columns=static_columns,
     )
 
 
-def _get_package_version() -> str:
+def get_package_version() -> str:
     with open("./pyproject.toml", "r") as f:
         config = toml.load(f)
         return config["tool"]["poetry"]["version"]
 
 
 def save_dataframe(dataframe: pd.DataFrame, ts: str) -> None:
-    version = "v" + _get_package_version()
+    version = "v" + get_package_version()
     path = f"benchmarking/output/{version}"
 
     if not os.path.exists(path):

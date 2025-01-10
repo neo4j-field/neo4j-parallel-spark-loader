@@ -105,7 +105,9 @@ def create_load_v_total_time_plot(dataframe: pd.DataFrame) -> Axes:
     return ax
 
 
-def create_time_v_row_count_for_graph_structure_line_plot(dataframe: pd.DataFrame, graph_structure: str) -> Axes:
+def create_time_v_row_count_for_graph_structure_line_plot(
+    dataframe: pd.DataFrame, graph_structure: str
+) -> Axes:
     times = ["process_time", "load_time", "total_time"]
 
     sns.set_theme()
@@ -114,17 +116,8 @@ def create_time_v_row_count_for_graph_structure_line_plot(dataframe: pd.DataFram
         ax = sns.lineplot(
             ax=axes[idx],
             data=dataframe[
-                (dataframe["graph_structure"] == graph_structure) & (dataframe["num_groups"].isin([1,3]))
-            ],
-            x="row_count",
-            y=s,
-            hue="load_strategy"
-        )
-        ax.set_xscale("log")
-        sns.lineplot(
-            ax=axes[idx],
-            data=dataframe[
-                (dataframe["graph_structure"] == graph_structure) & (dataframe["num_groups"].isin([1,3]))
+                (dataframe["graph_structure"] == graph_structure)
+                & (dataframe["num_groups"].isin([1, 3]))
             ],
             x="row_count",
             y=s,
@@ -134,11 +127,23 @@ def create_time_v_row_count_for_graph_structure_line_plot(dataframe: pd.DataFram
         sns.lineplot(
             ax=axes[idx],
             data=dataframe[
-                (dataframe["graph_structure"] == graph_structure) & (dataframe["num_groups"].isin([1,3]))
+                (dataframe["graph_structure"] == graph_structure)
+                & (dataframe["num_groups"].isin([1, 3]))
             ],
             x="row_count",
             y=s,
-            hue="load_strategy"
+            hue="load_strategy",
+        )
+        ax.set_xscale("log")
+        sns.lineplot(
+            ax=axes[idx],
+            data=dataframe[
+                (dataframe["graph_structure"] == graph_structure)
+                & (dataframe["num_groups"].isin([1, 3]))
+            ],
+            x="row_count",
+            y=s,
+            hue="load_strategy",
         )
         ax.set_title(TIME_TITLES.get(s))
         # ax.set_xticklabels(["Preprocess", "Load", "Total"])
