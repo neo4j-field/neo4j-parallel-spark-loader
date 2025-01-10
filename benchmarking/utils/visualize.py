@@ -150,7 +150,7 @@ def create_time_v_row_count_for_graph_structure_line_plot(dataframe: pd.DataFram
                 ax.set_ylabel("Time (s)")
             except Exception as e:
                 continue
-    fig.suptitle("Serial vs. Parallel Times")
+    fig.suptitle(f"{graph_structure.capitalize()} Serial vs. Parallel Times")
     lines_labels = [ax.get_legend_handles_labels() for ax in fig.axes]
     [ax.get_legend().remove() for ax in fig.axes]
 
