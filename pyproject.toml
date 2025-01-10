@@ -29,6 +29,7 @@ ruff = "^0.3.0"
 ipykernel = "^6.29.5"
 toml = "^0.10.2"
 tqdm = "^4.67.1"
+setuptools = "^75.8.0"
 
 [tool.ruff]
 target-version = "py312"

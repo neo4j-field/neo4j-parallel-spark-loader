@@ -17,6 +17,7 @@ TIME_TITLES = {
     "total_time": "Total Times",
 }
 
+SAMPLE_SIZES = [10, 100, 1_000, 10_000, 100_000, 1_000_000]
 
 def create_row_count_v_load_time_line_plot(dataframe: pd.DataFrame) -> Axes:
     sns.set_theme()
@@ -36,11 +37,11 @@ def create_row_count_v_load_time_line_plot(dataframe: pd.DataFrame) -> Axes:
 
 
 def create_num_groups_v_time_bar_plot(dataframe: pd.DataFrame, time_col: str) -> Axes:
-    sample_sizes = [10, 100, 1_000, 10_000, 100_000]
+    
     hue_order = dataframe["num_groups"].unique()
     sns.set_theme()
-    fig, axes = plt.subplots(1, 5, figsize=(15, 5), sharey=True)
-    for idx, s in enumerate(sample_sizes):
+    fig, axes = plt.subplots(1, len(SAMPLE_SIZES), figsize=(15, 5), sharey=True)
+    for idx, s in enumerate(SAMPLE_SIZES):
         ax = sns.barplot(
             ax=axes[idx],
             data=dataframe[
