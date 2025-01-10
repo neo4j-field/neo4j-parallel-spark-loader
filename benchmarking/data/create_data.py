@@ -1,8 +1,8 @@
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.types import StructType, StructField, IntegerType
+from pyspark.sql.functions import expr, rand, lit, concat, collect_set, col
 from random import randint
-
-import numpy as np
-import pandas as pd
-
+from functools import reduce
 
 def power_law_numbers(n: int, min_value: int, max_value: int, alpha: float):
     # Generate power law distributed numbers between 0 and 1
@@ -14,54 +14,69 @@ def power_law_numbers(n: int, min_value: int, max_value: int, alpha: float):
     return scaled_numbers
 
 
-def generate_unpartitioned_dataframe(num_rows: int, alpha: float) -> pd.DataFrame:
-    source_values = power_law_numbers(
-        n=num_rows, min_value=1, max_value=num_rows, alpha=alpha
-    )
-    target_values = power_law_numbers(
-        n=num_rows, min_value=1, max_value=num_rows, alpha=alpha
-    )
-    return pd.DataFrame({"source": source_values, "target": target_values})
+def generate_unpartitioned_dataframe(spark: SparkSession, num_rows: int) -> DataFrame:
+    
+    n_relationships = num_rows * 100
 
+    df = spark.range(0, n_relationships).select(
+            expr("id"),
+            rand(seed=42).alias("r1"),
+            rand(seed=43).alias("r2")
+        )
 
-def generate_partitioned_dataframe(
-    num_rows: int, alpha: float, partition_count: int
-) -> pd.DataFrame:
+        # Convert uniform random numbers to power law using inverse transform
+        # x = x_min * (1-r)^(-1/(alpha-1))
+        # For alpha=2.0, this simplifies to x = x_min / r
+    df = df.select(
+        expr("cast(10.0 / r1 as int) as source"),
+        expr("cast(10.0 / r2 as int) as target")
+        ).select("source", "target")
+
+    # Cache the result
+    rel_df = df.dropDuplicates().limit(num_rows).cache()
+
+    return rel_df
+
+def generate_partitioned_dataframe(spark: SparkSession,
+    num_rows: int, partition_count: int
+) -> DataFrame:
     mean_partition_size = num_rows / partition_count
     min_partition_size = int(mean_partition_size * 0.8)
     max_partition_size = int(mean_partition_size * 1.2)
     partition_sizes = [
         randint(min_partition_size, max_partition_size)
-        for i in range(0, partition_count - 1)
+        for _ in range(0, partition_count - 1)
     ]
     partition_sizes.append(num_rows - sum(partition_sizes))
     partition_dfs = []
     for i, partition_size in enumerate(partition_sizes):
         partition_df = generate_unpartitioned_dataframe(
-            num_rows=partition_size, alpha=alpha
+            spark=spark,
+            num_rows=partition_size
         )
-        partition_df["partition_col"] = i
-        partition_df["source"] = partition_df["source"].map(lambda x: f"{i}-{x}")
-        partition_df["target"] = partition_df["target"].map(lambda x: f"{i}-{x}")
+        partition_df = partition_df.withColumn("partition_col", lit(i))
+        partition_df = partition_df.withColumn("source", concat(lit(str(i) + "-"), partition_df["source"]))
+        partition_df = partition_df.withColumn("target", concat(lit(str(i) + "-"), partition_df["target"]))
         partition_dfs.append(partition_df)
-    return pd.concat(partition_dfs)
+
+    return reduce(DataFrame.unionAll, partition_dfs)
 
 
 if __name__ == "__main__":
-    NUM_ROWS = 100_000
-    ALPHA = 2.0
+    NUM_ROWS = 1_000_000
     PARTITION_COUNT = 20
     root = "benchmarking/data/"
+    spark: SparkSession = (SparkSession.builder
+                           .appName("benchmarking")
+                           .getOrCreate())
 
-    bipartite_df = generate_unpartitioned_dataframe(num_rows=NUM_ROWS, alpha=ALPHA)
-    bipartite_df.to_csv(root + "bipartite_data.csv", index=False)
-
-    monopartite_df = generate_unpartitioned_dataframe(num_rows=NUM_ROWS, alpha=ALPHA)
-    monopartite_df.to_csv(root + "monopartite_data.csv", index=False)
-
+    bipartite_df = generate_unpartitioned_dataframe(spark=spark, num_rows=NUM_ROWS)
+    bipartite_df.toPandas().to_csv(root + "bipartite_data.csv", header=True, index=False)
+    
+    monopartite_df = generate_unpartitioned_dataframe(spark=spark, num_rows=NUM_ROWS)
+    monopartite_df.toPandas().to_csv(root + "monopartite_data.csv", header=True, index=False)
+    
     predefined_components_df = generate_partitioned_dataframe(
-        num_rows=NUM_ROWS, alpha=ALPHA, partition_count=PARTITION_COUNT
+        spark=spark, num_rows=NUM_ROWS, partition_count=PARTITION_COUNT
     )
-    predefined_components_df.to_csv(
-        root + "predefined_components_data.csv", index=False
-    )
+    predefined_components_df.toPandas().to_csv(root + "predefined_components_data.csv", header=True, index=False)
