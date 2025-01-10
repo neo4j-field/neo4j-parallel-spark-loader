@@ -33,8 +33,8 @@ def sample_spark_dataframe(
 ) -> DataFrame:
     """Work-around for Spark's inaccurate sampling method."""
 
-    # if desired_number == spark_dataframe.count():
-    #     return spark_dataframe
+    if desired_number == spark_dataframe.count():
+        return spark_dataframe
 
     fraction = min(desired_number / spark_dataframe.count() * 1.1, 1.0)
 
@@ -123,11 +123,13 @@ if __name__ == "__main__":
     healthcheck(neo4j_driver=neo4j_driver)
 
     for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
+    # for idx in range(0, len(unsampled_tasks), 2):
         print(unsampled_tasks[idx].get("graph_structure"))
         for s in tqdm(sample_sizes, desc="sample sizes"):
+        # for s in sample_sizes:
             # sampled_sdf = sdfs.get(idx).sample(s)
             sampled_sdf: DataFrame = sample_spark_dataframe(sdfs.get(idx), s)
-
+            print("sampled df count: ", sampled_sdf.count())
             # create constraints
             create_constraints(neo4j_driver=neo4j_driver)
 
@@ -143,6 +145,7 @@ if __name__ == "__main__":
 
             # idx
             for n in tqdm(num_groups, desc="groups"):
+            # for n in num_groups:
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
