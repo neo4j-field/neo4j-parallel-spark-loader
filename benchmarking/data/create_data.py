@@ -1,3 +1,4 @@
+import numpy as np
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import StructType, StructField, IntegerType
 from pyspark.sql.functions import expr, rand, lit, concat, collect_set, col
