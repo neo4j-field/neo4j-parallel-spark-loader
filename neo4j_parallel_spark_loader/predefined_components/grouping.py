@@ -1,5 +1,4 @@
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import broadcast
 
 from ..utils.grouping import create_value_counts_dataframe, create_value_groupings
 from ..utils.verify_spark import verify_spark_version
@@ -45,7 +44,7 @@ def create_node_groupings(
     )
 
     final_sdf = spark_dataframe.join(
-        other=broadcast(value_groupings_sdf),
+        other=value_groupings_sdf,
         on=(spark_dataframe[partition_col] == value_groupings_sdf.value),
         how="left",
     ).drop(value_groupings_sdf.value)
