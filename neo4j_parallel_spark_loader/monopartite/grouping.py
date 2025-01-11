@@ -58,7 +58,7 @@ def create_node_groupings(
                  )
                  .drop(keys_sdf.value)
                  .join(
-                     other=keys_sdf.withColumnRenamed("group", "source_group"),
+                     other=keys_sdf.withColumnRenamed("group", "target_group"),
                      on=(spark_dataframe[target_col] == keys_sdf.value),
                      how="left"
                  )
