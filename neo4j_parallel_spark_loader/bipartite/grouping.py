@@ -1,4 +1,5 @@
 from pyspark.sql import DataFrame
+from pyspark.sql.functions import broadcast
 
 from ..utils.grouping import (
     create_group_column_from_source_and_target_groups,
@@ -60,12 +61,12 @@ def create_node_groupings(
     )
 
     final_sdf = spark_dataframe.join(
-        other=source_groupings_sdf.withColumnRenamed("group", "source_group"),
+        other=broadcast(source_groupings_sdf.withColumnRenamed("group", "source_group")),
         on=(spark_dataframe[source_col] == source_groupings_sdf.value),
         how="left",
     ).drop(source_groupings_sdf.value)
     final_sdf = final_sdf.join(
-        other=target_groupings_sdf.withColumnRenamed("group", "target_group"),
+        other=broadcast(target_groupings_sdf.withColumnRenamed("group", "target_group")),
         on=(spark_dataframe[target_col] == target_groupings_sdf.value),
         how="left",
     ).drop(target_groupings_sdf.value)

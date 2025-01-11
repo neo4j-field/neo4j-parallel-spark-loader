@@ -1,5 +1,5 @@
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, concat, greatest, least, lit
+from pyspark.sql.functions import broadcast, concat, greatest, least, lit
 
 from ..utils.grouping import (
     create_value_groupings,
@@ -50,18 +50,27 @@ def create_node_groupings(
         grouping_column="combined_col",
     )
 
-    final_sdf = spark_dataframe.join(
-        other=keys_sdf.withColumnRenamed("group", "source_group"),
-        on=(spark_dataframe[source_col] == keys_sdf.value),
-        how="left",
-    ).drop(keys_sdf.value)
-    final_sdf = final_sdf.join(
-        other=keys_sdf.withColumnRenamed("group", "target_group"),
-        on=(spark_dataframe[target_col] == keys_sdf.value),
-        how="left",
-    ).drop(keys_sdf.value)
+    # Broadcast keys_sdf once
+    broadcasted_keys = broadcast(keys_sdf)
 
-    final_sdf = final_sdf.drop("value")
+    # Create two views of the same broadcasted DataFrame
+    source_keys = broadcasted_keys.withColumnRenamed("group", "source_group")
+    target_keys = broadcasted_keys.withColumnRenamed("group", "target_group")
+
+    final_sdf = (spark_dataframe
+                 .join(
+                     other=source_keys,
+                     on=(spark_dataframe[source_col] == source_keys.value),
+                     how="left"
+                 )
+                 .drop(source_keys.value)
+                 .join(
+                     other=target_keys,
+                     on=(spark_dataframe[target_col] == target_keys.value),
+                     how="left"
+                 )
+                 .drop(target_keys.value)
+                 .drop("value"))
 
     final_sdf = final_sdf.withColumn(
         "group",
