@@ -32,7 +32,7 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
 
     coloring = color_complete_graph_with_self_loops(group_count)
 
-    coloring_data = [(f"{k[0]}--{k[1]}", v) for k, v in coloring.items()]
+    coloring_data = [(f"{k[0]} -- {k[1]}", v) for k, v in coloring.items()]
 
     # Create a DataFrame from the coloring dictionary
     coloring_df = spark.createDataFrame(coloring_data, ["group", "batch"])
