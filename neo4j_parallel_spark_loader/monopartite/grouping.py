@@ -50,20 +50,21 @@ def create_node_groupings(
         grouping_column="combined_col",
     )
 
-    final_sdf = (spark_dataframe
-                 .join(
-                     other=keys_sdf.withColumnRenamed("group", "source_group"),
-                     on=(spark_dataframe[source_col] == keys_sdf.value),
-                     how="left"
-                 )
-                 .drop(keys_sdf.value)
-                 .join(
-                     other=keys_sdf.withColumnRenamed("group", "target_group"),
-                     on=(spark_dataframe[target_col] == keys_sdf.value),
-                     how="left"
-                 )
-                 .drop(keys_sdf.value)
-                 .drop("value"))
+    final_sdf = (
+        spark_dataframe.join(
+            other=keys_sdf.withColumnRenamed("group", "source_group"),
+            on=(spark_dataframe[source_col] == keys_sdf.value),
+            how="left",
+        )
+        .drop(keys_sdf.value)
+        .join(
+            other=keys_sdf.withColumnRenamed("group", "target_group"),
+            on=(spark_dataframe[target_col] == keys_sdf.value),
+            how="left",
+        )
+        .drop(keys_sdf.value)
+        .drop("value")
+    )
 
     final_sdf = final_sdf.withColumn(
         "group",

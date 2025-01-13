@@ -1,9 +1,11 @@
 from typing import Any, Dict, List, Optional, Tuple
+
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
 from pyspark.sql import DataFrame
-import matplotlib.pyplot as plt
+
 
 def _format_spark_dataframe_for_visualization(
     spark_dataframe: DataFrame,
@@ -24,12 +26,16 @@ def _format_spark_dataframe_for_visualization(
     counts_sdf = spark_dataframe.groupBy("group", "batch").count()
     return [row.asDict() for row in counts_sdf.collect()]
 
+
 def create_ingest_heatmap(
-    spark_dataframe: DataFrame, title: str = "Parallel Ingest Heat Map", figsize: Optional[Tuple[float, float]] = None
+    spark_dataframe: DataFrame,
+    title: str = "Parallel Ingest Heat Map",
+    figsize: Optional[Tuple[float, float]] = None,
 ) -> Axes:
     """
     Create the ingest heatmap from a list of dictionaries.
     This heatmap will display batches on the y-axis and group numbers on the x-axis.
+    Group IDs will be displayed in parenthesis below the value count in each cell.
 
     Parameters
     ----------
@@ -62,12 +68,14 @@ def create_ingest_heatmap(
     # Transform data with group numbers
     transformed_data = []
     for d in data:
-        transformed_data.append({
-            "batch": d["batch"],
-            "group_num": batch_group_mappings[d["batch"]][d["group"]],
-            "count": d["count"],
-            "original_group": d["group"]
-        })
+        transformed_data.append(
+            {
+                "batch": d["batch"],
+                "group_num": batch_group_mappings[d["batch"]][d["group"]],
+                "count": d["count"],
+                "original_group": d["group"],
+            }
+        )
 
     # Extract unique x and y values
     y_values = sorted(set(d["batch"] for d in transformed_data), reverse=True)
@@ -83,11 +91,13 @@ def create_ingest_heatmap(
         x_idx = x_values.index(item["group_num"])
         heatmap_data[y_idx, x_idx] = item["count"]
         # Create annotation with count and original group name
-        annotation_labels[y_idx, x_idx] = f"{item['count']:,.0f}\n({item['original_group']})"
+        annotation_labels[y_idx, x_idx] = (
+            f"{item['count']:,.0f}\n({item['original_group']})"
+        )
 
     # Create figure with specified size
     plt.figure(figsize=figsize)
-    
+
     # Create heatmap
     ax = sns.heatmap(
         data=heatmap_data,
@@ -96,10 +106,11 @@ def create_ingest_heatmap(
         xticklabels=x_values,
         yticklabels=y_values,
         linewidths=0.5,
+        vmin=0,
     )
-    # plt.clim(0)
-    ax.set_xlabel("Group Number")
+
+    ax.set_xlabel("Spark Processor Node Number")
     ax.set_ylabel("Batch")
     ax.set_title(title)
-    
+
     return ax
