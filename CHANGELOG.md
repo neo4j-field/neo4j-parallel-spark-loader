@@ -11,6 +11,20 @@
 * visualizations to easily analyze results
 * method to partition results by package version automatically
 
+## 0.3.0
+
+### Changed
+
+* Swap heatmap visualization axes
+* Add group ID to each cell in heatmap
+* Heatmap scale start at 0
+* Update monopartite batching algorithm
+* Update ingest algorithm
+
+### Added
+
+* Examples demonstrating each parallel ingest method with real data
+
 ## 0.2.4
 
 ### Fixed

@@ -1,7 +1,7 @@
 from typing import Dict, Tuple
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import col
+from pyspark.sql.functions import broadcast
 
 
 def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
@@ -39,7 +39,7 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
 
     # Join the DataFrames
     result_df = spark_dataframe.join(
-        other=coloring_df,
+        other=broadcast(coloring_df),
         on=(spark_dataframe.group == coloring_df.group),
         how="left",  # Use left join to keep all records from spark_dataframe
     ).drop(
