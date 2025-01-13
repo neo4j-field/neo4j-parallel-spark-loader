@@ -6,6 +6,12 @@
 
 ### Added
 
+## 0.2.4
+
+### Fixed
+
+* Fixed delimiter in generated group ID to be consistent between group and batch processes in monopartite
+
 ## 0.2.3
 
 ### Fixed
