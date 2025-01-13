@@ -11,6 +11,12 @@
 * visualizations to easily analyze results
 * method to partition results by package version automatically
 
+## 0.3.1
+
+### Changed
+
+* Make `num_groups` optional parameter in ingest function. Allows for improved performance. 
+
 ## 0.3.0
 
 ### Changed
