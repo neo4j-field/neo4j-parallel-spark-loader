@@ -4,9 +4,13 @@
 
 ### Changed
 
-* Make `num_groups` optional parameter in ingest function. Allows for improved performance. 
-
 ### Added
+
+## 0.3.1
+
+### Changed
+
+* Make `num_groups` optional parameter in ingest function. Allows for improved performance. 
 
 ## 0.3.0
 
