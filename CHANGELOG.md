@@ -4,6 +4,12 @@
 
 ### Changed
 
+### Added
+
+## 0.3.0
+
+### Changed
+
 * Swap heatmap visualization axes
 * Add group ID to each cell in heatmap
 * Heatmap scale start at 0
