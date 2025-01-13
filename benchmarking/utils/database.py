@@ -136,6 +136,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
         spark_dataframe=grouped_and_batched_sdf,
         save_mode="Overwrite",
         options={"query": query},
+        num_groups=num_groups
     )
     return [proc_time, perf_counter() - start]
 
@@ -162,6 +163,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
         spark_dataframe=grouped_and_batched_sdf,
         save_mode="Overwrite",
         options={"query": query},
+        num_groups=num_groups
     )
 
     return [proc_time, perf_counter() - start]
@@ -188,6 +190,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
         spark_dataframe=grouped_and_batched_sdf,
         save_mode="Overwrite",
         options={"query": query},
+        num_groups=num_groups
     )
     return [proc_time, perf_counter() - start]
 
