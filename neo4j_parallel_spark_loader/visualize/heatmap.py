@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import seaborn as sns
 from matplotlib.axes import Axes
@@ -25,7 +25,7 @@ def _format_spark_dataframe_for_visualization(
     return [row.asDict() for row in counts_sdf.collect()]
 
 def create_ingest_heatmap(
-    spark_dataframe: DataFrame, title: str = "Parallel Ingest Heat Map", figsize=(8, 12)
+    spark_dataframe: DataFrame, title: str = "Parallel Ingest Heat Map", figsize: Optional[Tuple[float, float]] = None
 ) -> Axes:
     """
     Create the ingest heatmap from a list of dictionaries.
@@ -38,7 +38,7 @@ def create_ingest_heatmap(
     title : str, optional
         A title for the visualization, by default "Parallel Ingest Heat Map"
     figsize : tuple, optional
-        Figure size (width, height) in inches, by default (8, 12)
+        Figure size (width, height) in inches, by default None
 
     Returns
     -------
@@ -97,7 +97,7 @@ def create_ingest_heatmap(
         yticklabels=y_values,
         linewidths=0.5,
     )
-    
+    # plt.clim(0)
     ax.set_xlabel("Group Number")
     ax.set_ylabel("Batch")
     ax.set_title(title)

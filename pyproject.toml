@@ -10,7 +10,7 @@ exclude = ["tests/*", "benchmarking/*", "docs/*", "examples/*", "Makefile"]
 [tool.poetry.dependencies]
 python = "^3.10"
 pyspark = "^3.4.0"
-numpy = "^2.2.1"
+numpy = "^1.2.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -21,6 +21,7 @@ pytest-mock = "^3.12.0"
 python-dotenv = "^1.0.1"
 ruff = "^0.3.0"
 seaborn = "^0.13.2"
+requests = "^2.32.3"
 
 [tool.ruff]
 target-version = "py312"
