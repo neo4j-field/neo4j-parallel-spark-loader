@@ -6,10 +6,11 @@
 
 ### Added
 
-* methods to generate synthetic data that maps to each ingest method in the package
-* main method to iterate through parameters and collect benchmarking information for each ingest method in the package
-* visualizations to easily analyze results
-* method to partition results by package version automatically
+* Methods to generate synthetic data that maps to each ingest method in the package
+* Main method to iterate through parameters and collect benchmarking information for each ingest method in the package
+* Visualizations to easily analyze results
+* Method to partition results by package version automatically
+* Methods to retrieve and format real data for benchmarking scenarios
 
 ## 0.3.1
 
