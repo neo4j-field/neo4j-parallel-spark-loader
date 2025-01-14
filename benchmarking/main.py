@@ -1,10 +1,16 @@
+import argparse
 import warnings
 from datetime import datetime
-from typing import Any, Dict, Literal
+from typing import Any, Dict
 
 from pyspark.sql import DataFrame, SparkSession
 from tqdm import tqdm
 
+from benchmarking.data.remote_datasets import (
+    get_amazon_ratings_bipartite_spark_dataframe,
+    get_reddit_threads_predefined_components_spark_dataframe,
+    get_twitch_gamers_monopartite_spark_dataframe,
+)
 from benchmarking.utils.database import *
 from benchmarking.utils.healthcheck import healthcheck
 from benchmarking.utils.neo4j_driver import create_neo4j_driver
@@ -25,17 +31,49 @@ from benchmarking.utils.spark import (
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
-
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-e", "--env", help="The environment benchmarking is run in.")
+    ap.add_argument("-d", "--datatype", help="Generated or real")
+
+    args = ap.parse_args()
+
     spark_session: SparkSession = create_spark_session()
     neo4j_driver = create_neo4j_driver()
 
-    bp_sdf = load_data_into_spark_dataframe(spark_session, "bipartite")
-    mp_sdf = load_data_into_spark_dataframe(spark_session, "monopartite")
-    pc_sdf = load_data_into_spark_dataframe(spark_session, "predefined_components")
+    if args.datatype and args.datatype == "generated":
+        bp_sdf = load_data_into_spark_dataframe(spark_session, "bipartite")
+        mp_sdf = load_data_into_spark_dataframe(spark_session, "monopartite")
+        pc_sdf = load_data_into_spark_dataframe(spark_session, "predefined_components")
+        DATASET_NAMES = {
+            "bipartite": "generated",
+            "monopartite": "generated",
+            "predefined_components": "generated",
+        }
+    else:
+        bp_sdf = get_amazon_ratings_bipartite_spark_dataframe(spark_session)
+        mp_sdf = get_twitch_gamers_monopartite_spark_dataframe(spark_session)
+        pc_sdf = get_reddit_threads_predefined_components_spark_dataframe(spark_session)
+        DATASET_NAMES = {
+            "bipartite": "amazon_ratings",
+            "monopartite": "twitch_gamers",
+            "predefined_components": "reddit_threads",
+        }
+
+    if args.env:
+        match str(args.env).lower():
+            case "databricks":
+                ENV = "databricks"
+            case "local":
+                ENV = "local"
+            case _:
+                ENV = "unknown"
+    else:
+        ENV = "unknown"
 
     static_cols: Dict[str, Any] = get_spark_details(spark_session=spark_session)
     static_cols.update({"neo4j_parallel_spark_loader_version": get_package_version()})
+    static_cols.update({"environment": ENV})
 
     ingest_functions = {
         "bipartite": {
@@ -70,31 +108,37 @@ if __name__ == "__main__":
             "graph_structure": "bipartite",
             "load_strategy": "serial",
             "num_groups": SERIAL_GROUPS,
+            "dataset_name": DATASET_NAMES.get("bipartite"),
         },
         {
             "graph_structure": "bipartite",
             "load_strategy": "parallel",
             "num_groups": BIPARTITE_GROUPS,
+            "dataset_name": DATASET_NAMES.get("bipartite"),
         },
         {
             "graph_structure": "monopartite",
             "load_strategy": "serial",
             "num_groups": SERIAL_GROUPS,
+            "dataset_name": DATASET_NAMES.get("monopartite"),
         },
         {
             "graph_structure": "monopartite",
             "load_strategy": "parallel",
             "num_groups": MONOPARTITE_GROUPS,
+            "dataset_name": DATASET_NAMES.get("monopartite"),
         },
         {
             "graph_structure": "predefined_components",
             "load_strategy": "serial",
             "num_groups": SERIAL_GROUPS,
+            "dataset_name": DATASET_NAMES.get("predefined_components"),
         },
         {
             "graph_structure": "predefined_components",
             "load_strategy": "parallel",
             "num_groups": PREDEFINED_COMPONENTS_GROUPS,
+            "dataset_name": DATASET_NAMES.get("predefined_components"),
         },
     ]
 
@@ -109,7 +153,13 @@ if __name__ == "__main__":
 
     for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
         # for idx in range(0, len(unsampled_tasks), 2):
-        print(unsampled_tasks[idx].get("graph_structure"))
+        print(
+            unsampled_tasks[idx].get("graph_structure"),
+            " | ",
+            unsampled_tasks[idx].get("dataset_name"),
+        )
+        dataset_name = unsampled_tasks[idx].get("dataset_name")
+
         for s in tqdm(sample_sizes, desc="sample sizes"):
             # for s in sample_sizes:
             sampled_sdf: DataFrame = sample_spark_dataframe(sdfs.get(idx), s)
@@ -139,11 +189,9 @@ if __name__ == "__main__":
                     load_strategy=load_strategy,
                     num_groups=n,
                     static_columns=static_cols,
+                    dataset_name=dataset_name,
                 )
-                # print(
-                #     "NUM WORKERS: ",
-                #     get_current_spark_num_workers(spark_session=spark_session),
-                # )
+
                 results_df = append_results_to_dataframe(results_df, results_row)
 
                 save_dataframe(results_df, ts)
@@ -166,6 +214,7 @@ if __name__ == "__main__":
                     load_strategy=load_strategy,
                     num_groups=n,
                     static_columns=static_cols,
+                    dataset_name=dataset_name,
                 )
                 results_df = append_results_to_dataframe(results_df, results_row)
 

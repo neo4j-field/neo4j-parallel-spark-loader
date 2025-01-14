@@ -5,7 +5,7 @@ all: help
 
 benchmark:
 	docker compose -f benchmarking/docker-compose.yml up -d	
-	poetry run python3 benchmarking/main.py
+	poetry run python3 benchmarking/main.py --env=$(env) --datatype=$(datatype)
 	docker compose -f benchmarking/docker-compose.yml stop
 
 coverage:

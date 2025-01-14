@@ -1,0 +1,5 @@
+row_count,graph_structure,load_time,process_time,load_strategy,num_groups,available_cpus_per_node,spark.jars.packages,neo4j_parallel_spark_loader_version,dataset_name,environment,total_time
+10,bipartite,5.201343249995261,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,5.201343249995261
+10,bipartite,30.938614041020628,18.235073250019923,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,49.17368729104055
+100,bipartite,4.898689916997682,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,4.898689916997682
+100,bipartite,30.21128787501948,17.97180712496629,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,48.18309499998577

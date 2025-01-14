@@ -1,0 +1,13 @@
+row_count,graph_structure,load_time,process_time,load_strategy,num_groups,available_cpus_per_node,spark.jars.packages,neo4j_parallel_spark_loader_version,dataset_name,environment,total_time
+10,bipartite,1.0101768329623155,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,1.0101768329623155
+10,bipartite,5.910495625052135,1.6700845410232432,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,7.580580166075379
+100,bipartite,0.728233833971899,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,0.728233833971899
+100,bipartite,5.0425948750344105,1.2525389999500476,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,6.295133874984458
+1000,bipartite,0.8745629999903031,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,0.8745629999903031
+1000,bipartite,5.572982874989975,1.2792286250041798,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,6.852211499994155
+10000,bipartite,1.2383965000044554,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,1.2383965000044554
+10000,bipartite,6.384042083984241,1.5494693339569494,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,7.93351141794119
+100000,bipartite,2.286545041948557,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,2.286545041948557
+100000,bipartite,10.3238351669861,2.8797729579964653,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,13.203608124982566
+1000000,bipartite,19.96019116701791,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,19.96019116701791
+1000000,bipartite,39.401131791993976,10.860025834001135,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,local,50.26115762599511

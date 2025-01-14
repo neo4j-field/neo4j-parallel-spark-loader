@@ -19,6 +19,8 @@ def create_results_dataframe() -> pd.DataFrame:
             "available_cpus_per_node",
             "spark.jars.packages",
             "neo4j_parallel_spark_loader_version",
+            "dataset_name",
+            "environment",
         ]
     )
 
@@ -36,6 +38,7 @@ def create_row(
     process_time: float,
     load_strategy: Literal["parallel", "serial"],
     num_groups: int,
+    dataset_name: str = "unknown",
     static_columns: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
     return {
@@ -51,6 +54,8 @@ def create_row(
         "neo4j_parallel_spark_loader_version": static_columns.get(
             "neo4j_parallel_spark_loader_version"
         ),
+        "environment": static_columns.get("environment", "unknown"),
+        "dataset_name": dataset_name or "unknown",
     }
 
 
@@ -60,6 +65,7 @@ def generate_benchmark_results(
     graph_structure: Literal["bipartite", "monopartite", "predefined_components"],
     load_strategy: Literal["parallel", "serial"],
     num_groups: Optional[int] = None,
+    dataset_name: str = "unknown",
     static_columns: Dict[str, Any] = {},
 ) -> Dict[str, Any]:
     row_count = spark_dataframe.count()
@@ -72,6 +78,7 @@ def generate_benchmark_results(
         load_time=load_time,
         process_time=proc_time,
         num_groups=num_groups or 1,
+        dataset_name=dataset_name,
         static_columns=static_columns,
     )
 
