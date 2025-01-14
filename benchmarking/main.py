@@ -108,10 +108,10 @@ if __name__ == "__main__":
     healthcheck(neo4j_driver=neo4j_driver)
 
     for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
-    # for idx in range(0, len(unsampled_tasks), 2):
+        # for idx in range(0, len(unsampled_tasks), 2):
         print(unsampled_tasks[idx].get("graph_structure"))
         for s in tqdm(sample_sizes, desc="sample sizes"):
-        # for s in sample_sizes:
+            # for s in sample_sizes:
             sampled_sdf: DataFrame = sample_spark_dataframe(sdfs.get(idx), s)
             # print("sampled df count: ", sampled_sdf.count())
             # create constraints
@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
             # idx
             for n in tqdm(num_groups, desc="groups"):
-            # for n in num_groups:
+                # for n in num_groups:
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -138,7 +138,7 @@ if __name__ == "__main__":
                     ),
                     load_strategy=load_strategy,
                     num_groups=n,
-                    static_columns=static_cols
+                    static_columns=static_cols,
                 )
                 # print(
                 #     "NUM WORKERS: ",
@@ -156,7 +156,7 @@ if __name__ == "__main__":
             num_groups = unsampled_tasks[idx + 1].get("num_groups")
 
             for n in tqdm(num_groups, desc="groups"):
-            # for n in num_groups:
+                # for n in num_groups:
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -165,7 +165,7 @@ if __name__ == "__main__":
                     ),
                     load_strategy=load_strategy,
                     num_groups=n,
-                    static_columns=static_cols
+                    static_columns=static_cols,
                 )
                 results_df = append_results_to_dataframe(results_df, results_row)
 

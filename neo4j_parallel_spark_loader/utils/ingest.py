@@ -8,7 +8,7 @@ def ingest_spark_dataframe(
     spark_dataframe: DataFrame,
     save_mode: Literal["Overwrite", "Append"],
     options: Dict[str, Any],
-    num_groups: Optional[int] = None
+    num_groups: Optional[int] = None,
 ) -> None:
     """
     Saves a Spark DataFrame in multiple batches based on the 'batch' column values.
@@ -27,8 +27,8 @@ def ingest_spark_dataframe(
         Dictionary of options to configure the DataFrame writer.
         Refer to example for more information.
     num_groups: Optional[int], optional
-        The number of partitions to split Spark DataFrame into. 
-        If not provided, then will be calculated. 
+        The number of partitions to split Spark DataFrame into.
+        If not provided, then will be calculated.
         It is more efficient to pass this parameter explicitly. By default None
 
     Example
