@@ -195,15 +195,13 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
     return [proc_time, perf_counter() - start]
 
 
-def delete_relationships(spark_session: SparkSession) -> None:
-    df: DataFrame = spark_session.createDataFrame([{"value": 0}])
+def delete_relationships(neo4j_driver: Driver) -> None:
     query = """
 MATCH ()-[r]->()
 DELETE r
 """
-    df.write.format("org.neo4j.spark.DataSource").mode("Overwrite").option(
-        "query", query
-    ).save()
+    with neo4j_driver.session() as session:
+        session.run(query)
 
 
 def restore_database(neo4j_driver: Driver) -> None:
