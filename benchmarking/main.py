@@ -71,6 +71,8 @@ if __name__ == "__main__":
     else:
         ENV = "unknown"
 
+    AURA = ENV == "databricks"
+
     static_cols: Dict[str, Any] = get_spark_details(spark_session=spark_session)
     static_cols.update({"neo4j_parallel_spark_loader_version": get_package_version()})
     static_cols.update({"environment": ENV})
@@ -151,8 +153,8 @@ if __name__ == "__main__":
     # wait for database to be online before running
     healthcheck(neo4j_driver=neo4j_driver)
 
-    # for idx in tqdm(range(4, len(unsampled_tasks), 2), desc="graph structure"):
-    for idx in range(4, len(unsampled_tasks), 2):
+    for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
+        # for idx in range(0, len(unsampled_tasks), 2):
         print(
             unsampled_tasks[idx].get("graph_structure"),
             " | ",
@@ -160,10 +162,12 @@ if __name__ == "__main__":
         )
         dataset_name = unsampled_tasks[idx].get("dataset_name")
 
-        # for s in tqdm(sample_sizes, desc="sample sizes"):
-        for s in sample_sizes:
+        for s in tqdm(sample_sizes, desc="sample sizes"):
+            # for s in sample_sizes:
             sampled_sdf: DataFrame = sample_spark_dataframe(sdfs.get(idx), s)
-            # print("sampled df count: ", sampled_sdf.count())
+
+            # SERIAL
+            # ------
             # create constraints
             create_constraints(neo4j_driver=neo4j_driver)
 
@@ -178,8 +182,8 @@ if __name__ == "__main__":
             num_groups = unsampled_tasks[idx].get("num_groups")
 
             # idx
-            # for n in tqdm(num_groups, desc="groups"):
-            for n in num_groups:
+            for n in tqdm(num_groups, desc="groups"):
+                # for n in num_groups:
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -197,16 +201,18 @@ if __name__ == "__main__":
                 save_dataframe(results_df, ts)
 
                 # clean up relationships
-                print("\nDELETING RELATIONSHIPS\n")
+                # print("\nDELETING RELATIONSHIPS\n")
                 delete_relationships(neo4j_driver=neo4j_driver)
 
+            # PARALLEL
+            # --------
             # idx + 1
             load_strategy = unsampled_tasks[idx + 1].get("load_strategy")
             num_groups = unsampled_tasks[idx + 1].get("num_groups")
 
-            # for n in tqdm(num_groups, desc="groups"):
-            for n in num_groups:
-                print(f"Loading {s} Rows | {n} Spark Nodes")
+            for n in tqdm(num_groups, desc="groups"):
+                # for n in num_groups:
+                # print(f"Loading {s} Rows | {n} Spark Nodes")
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -223,11 +229,15 @@ if __name__ == "__main__":
                 save_dataframe(results_df, ts)
 
                 # clean up relationships
-                print("\nDELETING RELATIONSHIPS\n")
+                # print("\nDELETING RELATIONSHIPS\n")
                 delete_relationships(neo4j_driver=neo4j_driver)
 
             # refresh database
-            restore_database(neo4j_driver=neo4j_driver)
+            if AURA:
+                # delete all nodes and rels, since can't drop databases yet...
+                restore_aura_database(neo4j_driver=neo4j_driver)
+            else:
+                restore_database(neo4j_driver=neo4j_driver)
 
             # wait for database to restore
             healthcheck(neo4j_driver=neo4j_driver)

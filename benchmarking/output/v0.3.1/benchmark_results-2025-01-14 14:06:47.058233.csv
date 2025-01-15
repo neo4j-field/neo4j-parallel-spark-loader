@@ -1,6 +1,0 @@
-row_count,graph_structure,load_time,process_time,load_strategy,num_groups,available_cpus_per_node,spark.jars.packages,neo4j_parallel_spark_loader_version,dataset_name,environment,total_time
-10,predefined_components,1.549025457992684,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,1.549025457992684
-10,predefined_components,3.173258959024679,1.6148640420287848,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,4.788123001053464
-10,predefined_components,3.5555089580011554,1.8250126249622554,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,5.380521582963411
-100,predefined_components,2.074771374987904,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,2.074771374987904
-100,predefined_components,1.7523727919906378,1.025551957951393,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,2.7779247499420308

@@ -9,11 +9,16 @@ def create_spark_session(
     neo4j_username: Optional[str] = None,
     neo4j_password: Optional[str] = None,
     neo4j_uri: Optional[str] = None,
+    neo4j_database: Optional[str] = None,
 ) -> SparkSession:
     """
     Create a SparkSession connected with the specified Neo4j credentials.
     If not provided, will use local generic credentials.
     """
+    print(f"URI: {neo4j_uri or os.environ.get("NEO4J_URI", "neo4j://localhost:7687")}")
+    print(f"USERNAME: {neo4j_username or os.environ.get("NEO4J_USERNAME", "neo4j")}")
+    print(f"PASSWORD: {neo4j_password or os.environ.get("NEO4J_PASSWORD", "password")}")
+    print(f"DATABASE: {neo4j_database or os.environ.get("NEO4J_DATABASE", "neo4j")}")
 
     return (
         SparkSession.builder.appName("Benchmarking")
@@ -36,6 +41,10 @@ def create_spark_session(
         .config(
             "neo4j.authentication.basic.password",
             neo4j_password or os.environ.get("NEO4J_PASSWORD", "password"),
+        )
+        .config(
+            "neo4j.database",
+            neo4j_database or os.environ.get("NEO4J_DATABASE", "neo4j"),
         )
         .config("spark.driver.memory", "4g")
         .config("spark.executor.memory", "4g")
@@ -86,11 +95,4 @@ def sample_spark_dataframe(
     if desired_number == spark_dataframe.count():
         return spark_dataframe
 
-    # fraction = min(desired_number / spark_dataframe.count() * 1.1, 1.0)
-
-    # if fraction == 1.0:
-    #     return spark_dataframe
-
-    # return spark_dataframe.sample(False, fraction, seed=42).limit(desired_number)
     return spark_dataframe.select("*").orderBy(F.rand()).limit(desired_number)
-    # return spark_dataframe.select("*").limit(desired_number)

@@ -209,3 +209,13 @@ def restore_database(neo4j_driver: Driver) -> None:
 
     with neo4j_driver.session() as session:
         session.run(script)
+
+def restore_aura_database(neo4j_driver: Driver) -> None:
+    query = """
+CALL {
+MATCH (n)-[r]->()
+DETACH DELETE n, r
+} IN 10 CONCURRENT TRANSACTIONS OF 1000 ROWS
+    """
+    with neo4j_driver.session() as session:
+        session.run(query)

@@ -105,18 +105,20 @@ def get_reddit_threads_predefined_components_spark_dataframe(
 ) -> DataFrame:
     K = "reddit_threads"
     csv_loc = f"benchmarking/data/{K}.csv"
+
     if not os.path.exists(csv_loc):
         print("Gathering Reddit Dataset...")
-        # Download and read the zip file content
         response = requests.get(FILE_ADDRESSES.get(K))
         zip_file = ZipFile(BytesIO(response.content))
 
-        # Read the JSON file content from the zip
         with zip_file.open(FILE_NAMES.get(K)) as file:
-            # Parse JSON content
             data = json.loads(file.read().decode("utf-8"))
             flattened = [
-                [int(t[0]), int(sublist[0]), int(sublist[1])]
+                [
+                    str(t[0]),
+                    str(sublist[0]) + "-" + str(t[0]),
+                    str(sublist[1]) + "-" + str(t[0]),
+                ]
                 for t in data.items()
                 for sublist in t[1]
             ]
@@ -124,10 +126,6 @@ def get_reddit_threads_predefined_components_spark_dataframe(
 
             df.to_csv(f"benchmarking/data/{K}.csv", index=False, header=True)
 
-            # Create DataFrame from parsed JSON
-            # return spark_session.createDataFrame(
-            #     flattened, schema=SCHEMAS.get(K)
-            # ).withColumnsRenamed({"source_id": "source", "target_id": "target"})
     return spark_session.read.csv(
         csv_loc, header=True, maxColumns=1_000_000
     ).withColumnsRenamed(
