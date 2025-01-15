@@ -1,0 +1,15 @@
+row_count,graph_structure,load_time,process_time,load_strategy,num_groups,available_cpus_per_node,spark.jars.packages,neo4j_parallel_spark_loader_version,dataset_name,environment,total_time
+10,predefined_components,1.750675917020999,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,1.750675917020999
+10,predefined_components,2.270850541011896,0.8452707920223475,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.1161213330342434
+10,predefined_components,2.5972718340344727,1.0132299159886315,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.6105017500231043
+100,predefined_components,1.987875334045384,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,1.987875334045384
+100,predefined_components,2.2418943750089966,0.8568674169946462,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.0987617920036428
+100,predefined_components,2.1408740000333637,0.6986800000304356,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,2.8395540000637993
+1000,predefined_components,1.6514211670146324,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,1.6514211670146324
+1000,predefined_components,2.166139375010971,1.0237347499933094,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.1898741250042804
+1000,predefined_components,2.606162709009368,0.9988719999673776,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.6050347089767456
+10000,predefined_components,1.415365583030507,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,1.415365583030507
+10000,predefined_components,2.248377875017468,0.7969284169957973,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.045306292013265
+10000,predefined_components,2.6839138750219718,0.9221584160113707,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.6060722910333425
+100000,predefined_components,3.25646466598846,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,3.25646466598846
+100000,predefined_components,4.510798749979585,1.640087208012119,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,reddit_threads,local,6.150885957991704

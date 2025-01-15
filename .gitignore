@@ -1,6 +1,7 @@
 Neo4j-*.txt
 .DS_Store
 benchmarking/data/*.csv
+data/datasets/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

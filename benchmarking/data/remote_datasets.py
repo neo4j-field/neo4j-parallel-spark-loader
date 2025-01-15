@@ -130,4 +130,6 @@ def get_reddit_threads_predefined_components_spark_dataframe(
             # ).withColumnsRenamed({"source_id": "source", "target_id": "target"})
     return spark_session.read.csv(
         csv_loc, header=True, maxColumns=1_000_000
-    ).withColumnsRenamed({"source_id": "source", "target_id": "target", "graph_id": "partition_col"})
+    ).withColumnsRenamed(
+        {"source_id": "source", "target_id": "target", "graph_id": "partition_col"}
+    )

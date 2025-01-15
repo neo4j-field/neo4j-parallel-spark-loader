@@ -151,8 +151,8 @@ if __name__ == "__main__":
     # wait for database to be online before running
     healthcheck(neo4j_driver=neo4j_driver)
 
-    for idx in tqdm(range(0, len(unsampled_tasks), 2), desc="graph structure"):
-        # for idx in range(0, len(unsampled_tasks), 2):
+    # for idx in tqdm(range(4, len(unsampled_tasks), 2), desc="graph structure"):
+    for idx in range(4, len(unsampled_tasks), 2):
         print(
             unsampled_tasks[idx].get("graph_structure"),
             " | ",
@@ -160,8 +160,8 @@ if __name__ == "__main__":
         )
         dataset_name = unsampled_tasks[idx].get("dataset_name")
 
-        for s in tqdm(sample_sizes, desc="sample sizes"):
-            # for s in sample_sizes:
+        # for s in tqdm(sample_sizes, desc="sample sizes"):
+        for s in sample_sizes:
             sampled_sdf: DataFrame = sample_spark_dataframe(sdfs.get(idx), s)
             # print("sampled df count: ", sampled_sdf.count())
             # create constraints
@@ -178,8 +178,8 @@ if __name__ == "__main__":
             num_groups = unsampled_tasks[idx].get("num_groups")
 
             # idx
-            for n in tqdm(num_groups, desc="groups"):
-                # for n in num_groups:
+            # for n in tqdm(num_groups, desc="groups"):
+            for n in num_groups:
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -197,14 +197,16 @@ if __name__ == "__main__":
                 save_dataframe(results_df, ts)
 
                 # clean up relationships
-                delete_relationships(spark_session=spark_session)
+                print("\nDELETING RELATIONSHIPS\n")
+                delete_relationships(neo4j_driver=neo4j_driver)
 
             # idx + 1
             load_strategy = unsampled_tasks[idx + 1].get("load_strategy")
             num_groups = unsampled_tasks[idx + 1].get("num_groups")
 
-            for n in tqdm(num_groups, desc="groups"):
-                # for n in num_groups:
+            # for n in tqdm(num_groups, desc="groups"):
+            for n in num_groups:
+                print(f"Loading {s} Rows | {n} Spark Nodes")
                 results_row = generate_benchmark_results(
                     spark_dataframe=sampled_sdf,
                     graph_structure=graph_structure,
@@ -221,7 +223,8 @@ if __name__ == "__main__":
                 save_dataframe(results_df, ts)
 
                 # clean up relationships
-                delete_relationships(spark_session=spark_session)
+                print("\nDELETING RELATIONSHIPS\n")
+                delete_relationships(neo4j_driver=neo4j_driver)
 
             # refresh database
             restore_database(neo4j_driver=neo4j_driver)

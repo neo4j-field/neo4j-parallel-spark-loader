@@ -8,6 +8,9 @@ benchmark:
 	poetry run python3 benchmarking/main.py --env=$(env) --datatype=$(datatype)
 	docker compose -f benchmarking/docker-compose.yml stop
 
+benchmark_databricks:
+	poetry run python3 benchmarking/main.py --env=$(env) --datatype=$(datatype)
+
 coverage:
 	poetry run coverage run -m pytest tests/unit
 	poetry run coverage report --fail-under=85
