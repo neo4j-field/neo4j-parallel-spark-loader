@@ -1,8 +1,10 @@
 import pytest
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, SparkSession
+
+from data.get_datasets import get_reddit_threads_predefined_components_spark_dataframe
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def spark_fixture():
     spark = (
         SparkSession.builder.appName("Unit and Integration Testing")
@@ -17,3 +19,12 @@ def spark_fixture():
         .getOrCreate()
     )
     yield spark
+
+
+@pytest.fixture(scope="session")
+def reddit_threads_predefined_components_spark_dataframe(
+    spark_fixture: SparkSession,
+) -> DataFrame:
+    return get_reddit_threads_predefined_components_spark_dataframe(
+        spark_session=spark_fixture
+    )

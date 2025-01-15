@@ -24,7 +24,7 @@ def test_ingest_with_bipartite_spark_dataframe(
         .load()
     )
 
-    nodes.show()
+    # nodes.show()
 
     assert nodes.count() == 5
 
