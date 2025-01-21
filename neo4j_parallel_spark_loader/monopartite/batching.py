@@ -24,8 +24,8 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     spark: SparkSession = spark_dataframe.sparkSession
 
     group_count = (
-        spark_dataframe.select("source_group")
-        .union(spark_dataframe.select("target_group"))
+        spark_dataframe.select("source_group").withColumnRenamed("source_group", "group")
+        .union(spark_dataframe.select("target_group").withColumnRenamed("target_group", "group"))
         .distinct()
         .count()
     )

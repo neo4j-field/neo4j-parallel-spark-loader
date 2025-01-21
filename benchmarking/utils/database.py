@@ -198,7 +198,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
 def delete_relationships(neo4j_driver: Driver) -> None:
     query = """
 MATCH ()-[r]->()
-DELETE r
+CALL (r) { DELETE r } IN TRANSACTIONS
 """
     with neo4j_driver.session() as session:
         session.run(query)
@@ -211,11 +211,15 @@ def restore_database(neo4j_driver: Driver) -> None:
         session.run(script)
 
 def restore_aura_database(neo4j_driver: Driver) -> None:
-    query = """
-CALL {
-MATCH (n)-[r]->()
-DETACH DELETE n, r
-} IN 10 CONCURRENT TRANSACTIONS OF 1000 ROWS
+    node_delete_query = """
+MATCH (n)
+CALL (n) {
+DELETE n
+} IN CONCURRENT TRANSACTIONS
     """
     with neo4j_driver.session() as session:
-        session.run(query)
+        session.run(node_delete_query)
+    records, _, _ = neo4j_driver.execute_query("SHOW CONSTRAINTS YIELD name")
+    for record in records:
+        neo4j_driver.execute_query(f"DROP CONSTRAINT {record['name']}")
+    

@@ -4,7 +4,9 @@ from typing import Any, Callable, Dict, Literal, Optional
 
 import pandas as pd
 import toml
-from pyspark.sql import DataFrame
+from pyspark.sql import DataFrame, SparkSession
+
+from pyspark.dbutils import DBUtils
 
 
 def create_results_dataframe() -> pd.DataFrame:
@@ -84,16 +86,22 @@ def generate_benchmark_results(
 
 
 def get_package_version() -> str:
-    with open("./pyproject.toml", "r") as f:
+    with open("../pyproject.toml", "r") as f:
         config = toml.load(f)
         return config["tool"]["poetry"]["version"]
 
 
-def save_dataframe(dataframe: pd.DataFrame, ts: str) -> None:
+def save_dataframe(dataframe: pd.DataFrame, ts: str, spark: Optional[SparkSession] = None) -> None:
     version = "v" + get_package_version()
-    path = f"benchmarking/output/{version}"
+
+    path = f"./output/{version}"
 
     if not os.path.exists(path):
         os.makedirs(path)
 
-    dataframe.to_csv(f"{path}/benchmark_results-{ts}.csv", index=False)
+    file_path = f"{path}/benchmark_results-{ts}.csv"
+    dataframe.to_csv(file_path, index=False)
+    
+    print(file_path)
+
+    
