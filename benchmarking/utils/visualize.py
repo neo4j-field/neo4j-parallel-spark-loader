@@ -17,7 +17,8 @@ TIME_TITLES = {
     "total_time": "Total Times",
 }
 
-SAMPLE_SIZES = [10, 100, 1_000, 10_000, 100_000, 1_000_000]
+SAMPLE_SIZES = [125000, 250000, 500000, 1_000_000, 2_000_000, 4_000_000]
+SAMPLE_LABELS = ['125K', '250K', '500K', '1M', '2M', '4M']
 
 
 def create_row_count_v_load_time_line_plot(dataframe: pd.DataFrame) -> Axes:
@@ -34,19 +35,28 @@ def create_row_count_v_load_time_line_plot(dataframe: pd.DataFrame) -> Axes:
     ax.set_title("Serial vs. Parallel Ingest Using Spark")
     sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
     plt.xscale("log")
+    tick_locations = SAMPLE_SIZES
+    tick_labels = SAMPLE_LABELS
+    plt.xticks(tick_locations, tick_labels, rotation=45)
     return ax
 
 
 def create_num_groups_v_time_bar_plot(dataframe: pd.DataFrame, time_col: str) -> Axes:
-    hue_order = dataframe["num_groups"].unique()
+    hue_order = dataframe[dataframe["load_strategy"] == "parallel"]["num_groups"].drop_duplicates().sort_values()
+    # Define the mapping for abbreviated labels
+    label_map = {
+        "predefined_components": "pdc",
+        "bipartite": "bp",
+        "monopartite": "mp"
+    }
     sns.set_theme()
     fig, axes = plt.subplots(1, len(SAMPLE_SIZES), figsize=(15, 5), sharey=True)
     for idx, s in enumerate(SAMPLE_SIZES):
         ax = sns.barplot(
             ax=axes[idx],
             data=dataframe[
-                (dataframe["load_strategy"] == "parallel")
-                & (dataframe["row_count"] == s)
+                (dataframe["load_strategy"] == "parallel")& 
+                (dataframe["row_count"] == s)
             ],
             x="graph_structure",
             y=time_col,
@@ -54,14 +64,17 @@ def create_num_groups_v_time_bar_plot(dataframe: pd.DataFrame, time_col: str) ->
             hue_order=hue_order,
         )
         ax.set_title(str(s) + " Samples")
-        ax.set_xticklabels(["bip", "mon", "pdc"])
         ax.set_xlabel("Graph Structure")
+        ax.set_xticklabels([label_map[label.get_text()] for label in ax.get_xticklabels()])
 
         if idx == 0:
             try:
                 ax.set_ylabel(TIME_LABELS.get(time_col))
             except Exception as e:
                 continue
+        else:
+            # Remove ylabel for all other plots
+            ax.set_ylabel("")
 
     fig.suptitle("Number of Groups Influence on Parallel Ingest Using Spark")
 
@@ -118,11 +131,12 @@ def create_time_v_row_count_for_graph_structure_line_plot(
             ax=axes[idx],
             data=dataframe[
                 (dataframe["graph_structure"] == graph_structure)
-                & (dataframe["num_groups"].isin([1, 3]))
+                #& (dataframe["num_groups"].isin([1, 3]))
             ],
             x="row_count",
             y=s,
             hue="load_strategy",
+            style="num_groups",
         )
         ax.set_xscale("log")
         sns.lineplot(
@@ -150,6 +164,8 @@ def create_time_v_row_count_for_graph_structure_line_plot(
         # ax.set_xticklabels(["Preprocess", "Load", "Total"])
         ax.set_xlabel("Row Count")
         ax.set_xscale("log")
+        ax.set_xticks(SAMPLE_SIZES)
+        ax.set_xticklabels(SAMPLE_LABELS)
 
         if idx == 0:
             try:
