@@ -82,7 +82,8 @@ def get_twitch_gamers_monopartite_spark_dataframe(
         # Convert to string buffer for Spark to read
         content = file.read().decode("utf-8")
         
-        rdd = spark_session.sparkContext.parallelize(content.splitlines())
+        lines = content.splitlines()[1:]
+        rdd = spark_session.sparkContext.parallelize(lines)
 
         # Convert RDD to DataFrame with schema
         twitch_df = spark_session.read.csv(rdd, schema=SCHEMAS.get("twitch_gamers"), header=False)
