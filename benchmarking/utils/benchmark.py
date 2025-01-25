@@ -78,10 +78,10 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
     }
 
     # sample_fractions = [0.0001, 0.001, 0.01, 0.1, 1.0]
-    sample_sizes = [125_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000]
-
+    
     sdfs = {0: pc_sdf, 2: mp_sdf, 4: bp_sdf}
 
+    SAMPLE_SIZES = [125_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000]
     SERIAL_GROUPS = [1]
     BIPARTITE_GROUPS = [5, 20]
     MONOPARTITE_GROUPS = [9, 19]
@@ -143,22 +143,27 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             unsampled_tasks[idx].get("dataset_name"),
         )
         dataset_name = unsampled_tasks[idx].get("dataset_name")
+        graph_structure = unsampled_tasks[idx].get("graph_structure")
 
-        for s in tqdm(sample_sizes, desc="sample sizes"):
-            # for s in sample_sizes:
-            sampled_sdf: DataFrame = sdfs.get(idx).limit(s)
+        sdf = sdfs.get(idx)
+
+        sdf_count = sdf.count()
+        sdf_sample_sizes = SAMPLE_SIZES + [sdf_count]
+
+        # create constraints
+        create_constraints(neo4j_driver=neo4j_driver)
+
+        # load nodes
+        fn = ingest_functions.get(graph_structure).get("nodes")
+        fn(sdf)
+
+        for s in tqdm(sdf_sample_sizes, desc="sample sizes"):
+
+            sampled_sdf: DataFrame = sdf.limit(s)
 
             # SERIAL
             # ------
-            # create constraints
-            create_constraints(neo4j_driver=neo4j_driver)
-
-            graph_structure = unsampled_tasks[idx].get("graph_structure")
-
-            # load nodes
-            fn = ingest_functions.get(graph_structure).get("nodes")
-            fn(sampled_sdf)
-
+  
             # load relationships
             load_strategy = unsampled_tasks[idx].get("load_strategy")
             num_groups = unsampled_tasks[idx].get("num_groups")
