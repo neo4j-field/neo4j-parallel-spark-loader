@@ -15,8 +15,10 @@ from neo4j_parallel_spark_loader import (
 
 def create_constraints(neo4j_driver: Driver) -> None:
     queries = [
-        "create constraint node_a_constraint if not exists for (n:NodeA) require n.id is node key;",
-        "create constraint node_b_constraint if not exists for (n:NodeB) require n.id is node key;",
+        "create constraint node_a_bp_constraint if not exists for (n:BPNodeA) require n.id is node key;",
+        "create constraint node_b_bp_constraint if not exists for (n:BPNodeB) require n.id is node key;",
+        "create constraint node_a_mp_constraint if not exists for (n:MPNodeA) require n.id is node key;",
+        "create constraint node_a_pc_constraint if not exists for (n:PCNodeA) require n.id is node key;",
     ]
 
     with neo4j_driver.session() as session:
@@ -27,12 +29,8 @@ def load_bipartite_nodes(spark_dataframe: DataFrame) -> None:
     node_a = spark_dataframe.select("source").distinct()
     node_b = spark_dataframe.select("target").distinct()
 
-    query_a = """
-MERGE (:NodeA {id: event.source})
-"""
-    query_b = """
-MERGE (:NodeB {id: event.target})
-"""
+    query_a = """MERGE (:BPNodeA {id: event.source})"""
+    query_b = """MERGE (:BPNodeB {id: event.target})"""
 
     (
         node_a.write.format("org.neo4j.spark.DataSource")
@@ -48,7 +46,6 @@ MERGE (:NodeB {id: event.target})
         .save()
     )
 
-
 def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
     node_a = (
         spark_dataframe.select("source")
@@ -62,9 +59,29 @@ def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
         .distinct()
     )
 
-    query_a = """
-MERGE (:NodeA {id: event.id})
-"""
+    query_a = """MERGE (:MPNodeA {id: event.id})"""
+
+    (
+        node_a.write.format("org.neo4j.spark.DataSource")
+        .mode("Overwrite")
+        .option("query", query_a)
+        .save()
+    )
+
+def load_predefined_component_nodes(spark_dataframe: DataFrame) -> None:
+    node_a = (
+        spark_dataframe.select("source")
+        .withColumnRenamed("source", "id")
+        .distinct()
+        .union(
+            spark_dataframe.select("target")
+            .withColumnRenamed("target", "id")
+            .distinct()
+        )
+        .distinct()
+    )
+
+    query_a = """MERGE (:PCNodeA {id: event.source})"""
 
     (
         node_a.write.format("org.neo4j.spark.DataSource")
@@ -78,16 +95,16 @@ def load_bipartite_relationships_in_serial(
     spark_dataframe: DataFrame, num_groups: Optional[int] = None
 ) -> List[float]:
     query = """
-MATCH (source:NodeA {id: event.source})
-MATCH (target:NodeB {id: event.target})
-MERGE (source)-[:HAS_RELATIONSHIP]->(target)
-"""
+            MATCH (source:BPNodeA {id: event.source})
+            MATCH (target:BPNodeB {id: event.target})
+            CREATE (source)-[:HAS_RELATIONSHIP]->(target)
+            """
     start = perf_counter()
     rels = spark_dataframe.select("source", "target")
     (
         rels.coalesce(1)
         .write.format("org.neo4j.spark.DataSource")
-        .mode("Overwrite")
+        .mode("Append")
         .option("query", query)
         .save()
     )
@@ -98,16 +115,35 @@ def load_monopartite_relationships_in_serial(
     spark_dataframe: DataFrame, num_groups: Optional[int] = None
 ) -> List[float]:
     query = """
-MATCH (source:NodeA {id: event.source})
-MATCH (target:NodeA {id: event.target})
-MERGE (source)-[:HAS_RELATIONSHIP]->(target)
-"""
+            MATCH (source:MPNodeA {id: event.source})
+            MATCH (target:MPNodeA {id: event.target})
+            CREATE (source)-[:HAS_RELATIONSHIP]->(target)
+            """
     start = perf_counter()
     rels = spark_dataframe.select("source", "target")
     (
         rels.coalesce(1)
         .write.format("org.neo4j.spark.DataSource")
-        .mode("Overwrite")
+        .mode("Append")
+        .option("query", query)
+        .save()
+    )
+    return [0.0, perf_counter() - start]
+
+def load_predefined_components_relationships_in_serial(
+    spark_dataframe: DataFrame, num_groups: Optional[int] = None
+) -> List[float]:
+    query = """
+            MATCH (source:PCNodeA {id: event.source})
+            MATCH (target:PCNodeA {id: event.target})
+            CREATE (source)-[:HAS_RELATIONSHIP]->(target)
+            """
+    start = perf_counter()
+    rels = spark_dataframe.select("source", "target")
+    (
+        rels.coalesce(1)
+        .write.format("org.neo4j.spark.DataSource")
+        .mode("Append")
         .option("query", query)
         .save()
     )
@@ -118,10 +154,10 @@ def load_bipartite_relationships_in_parallel(
     spark_dataframe: DataFrame, num_groups: int
 ) -> List[float]:
     query = """
-MATCH (source:NodeA {id: event.source})
-MATCH (target:NodeB {id: event.target})
-MERGE (source)-[:HAS_RELATIONSHIP]->(target)
-"""
+    MATCH (source:BPNodeA {id: event.source})
+    MATCH (target:BPNodeB {id: event.target})
+    CREATE (source)-[:HAS_RELATIONSHIP]->(target)
+    """
     start = perf_counter()
     grouped_and_batched_sdf = bipartite.group_and_batch_spark_dataframe(
         spark_dataframe=spark_dataframe,
@@ -134,7 +170,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
     start = perf_counter()
     ingest_spark_dataframe(
         spark_dataframe=grouped_and_batched_sdf,
-        save_mode="Overwrite",
+        save_mode="Append",
         options={"query": query},
         num_groups=num_groups,
     )
@@ -145,10 +181,10 @@ def load_monopartite_relationships_in_parallel(
     spark_dataframe: DataFrame, num_groups: int
 ) -> List[float]:
     query = """
-MATCH (source:NodeA {id: event.source})
-MATCH (target:NodeA {id: event.target})
-MERGE (source)-[:HAS_RELATIONSHIP]->(target)
-"""
+    MATCH (source:MPNodeA {id: event.source})
+    MATCH (target:MPNodeA {id: event.target})
+    CREATE (source)-[:HAS_RELATIONSHIP]->(target)
+    """
     start = perf_counter()
     grouped_and_batched_sdf = monopartite.group_and_batch_spark_dataframe(
         spark_dataframe=spark_dataframe,
@@ -161,7 +197,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
     start = perf_counter()
     ingest_spark_dataframe(
         spark_dataframe=grouped_and_batched_sdf,
-        save_mode="Overwrite",
+        save_mode="Append",
         options={"query": query},
         num_groups=num_groups,
     )
@@ -173,10 +209,10 @@ def load_predefined_components_relationships_in_parallel(
     spark_dataframe: DataFrame, num_groups: int
 ) -> List[float]:
     query = """
-MATCH (source:NodeA {id: event.source})
-MATCH (target:NodeB {id: event.target})
-MERGE (source)-[:HAS_RELATIONSHIP]->(target)
-"""
+    MATCH (source:PCNodeA {id: event.source})
+    MATCH (target:PCNodeB {id: event.target})
+    CREATE (source)-[:HAS_RELATIONSHIP]->(target)
+    """
     start = perf_counter()
     grouped_and_batched_sdf = predefined_components.group_and_batch_spark_dataframe(
         spark_dataframe=spark_dataframe,
@@ -188,7 +224,7 @@ MERGE (source)-[:HAS_RELATIONSHIP]->(target)
     start = perf_counter()
     ingest_spark_dataframe(
         spark_dataframe=grouped_and_batched_sdf,
-        save_mode="Overwrite",
+        save_mode="Append",
         options={"query": query},
         num_groups=num_groups,
     )

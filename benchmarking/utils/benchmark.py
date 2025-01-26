@@ -60,11 +60,6 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
     static_cols.update({"environment": environment})
 
     ingest_functions = {
-        "bipartite": {
-            "serial": load_bipartite_relationships_in_serial,
-            "parallel": load_bipartite_relationships_in_parallel,
-            "nodes": load_bipartite_nodes,
-        },
         "monopartite": {
             "serial": load_monopartite_relationships_in_serial,
             "parallel": load_monopartite_relationships_in_parallel,
@@ -75,31 +70,24 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             "parallel": load_predefined_components_relationships_in_parallel,
             "nodes": load_bipartite_nodes,
         },
+        "bipartite": {
+            "serial": load_bipartite_relationships_in_serial,
+            "parallel": load_bipartite_relationships_in_parallel,
+            "nodes": load_bipartite_nodes,
+        },
     }
 
     # sample_fractions = [0.0001, 0.001, 0.01, 0.1, 1.0]
     
-    sdfs = {0: pc_sdf, 2: mp_sdf, 4: bp_sdf}
+    sdfs = {0: mp_sdf, 2: bp_sdf, 4: pc_sdf}
 
     SAMPLE_SIZES = [125_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000]
     SERIAL_GROUPS = [1]
     BIPARTITE_GROUPS = [5, 20]
-    MONOPARTITE_GROUPS = [9, 19]
+    MONOPARTITE_GROUPS = [10, 20]
     PREDEFINED_COMPONENTS_GROUPS = [5, 20]
 
     unsampled_tasks = [
-        {
-            "graph_structure": "predefined_components",
-            "load_strategy": "serial",
-            "num_groups": SERIAL_GROUPS,
-            "dataset_name": DATASET_NAMES.get("predefined_components"),
-        },
-        {
-            "graph_structure": "predefined_components",
-            "load_strategy": "parallel",
-            "num_groups": PREDEFINED_COMPONENTS_GROUPS,
-            "dataset_name": DATASET_NAMES.get("predefined_components"),
-        },
         {
             "graph_structure": "monopartite",
             "load_strategy": "serial",
@@ -123,6 +111,18 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             "load_strategy": "parallel",
             "num_groups": BIPARTITE_GROUPS,
             "dataset_name": DATASET_NAMES.get("bipartite"),
+        },        
+        {
+            "graph_structure": "predefined_components",
+            "load_strategy": "serial",
+            "num_groups": SERIAL_GROUPS,
+            "dataset_name": DATASET_NAMES.get("predefined_components"),
+        },
+        {
+            "graph_structure": "predefined_components",
+            "load_strategy": "parallel",
+            "num_groups": PREDEFINED_COMPONENTS_GROUPS,
+            "dataset_name": DATASET_NAMES.get("predefined_components"),
         },
     ]
 
