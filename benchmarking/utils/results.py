@@ -6,8 +6,6 @@ import pandas as pd
 import toml
 from pyspark.sql import DataFrame, SparkSession
 
-from pyspark.dbutils import DBUtils
-
 
 def create_results_dataframe() -> pd.DataFrame:
     return pd.DataFrame(

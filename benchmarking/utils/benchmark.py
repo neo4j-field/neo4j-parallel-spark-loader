@@ -24,10 +24,8 @@ from benchmarking.utils.results import (
 )
 from benchmarking.utils.spark import (
     create_spark_session,
-    get_current_spark_num_workers,
     get_spark_details,
     load_data_into_spark_dataframe,
-    sample_spark_dataframe,
 )
 
 def generate_benchmarks(environment: Literal["databricks", "local"],
