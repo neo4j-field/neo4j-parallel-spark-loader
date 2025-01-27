@@ -68,7 +68,7 @@ def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
         .save()
     )
 
-def load_predefined_component_nodes(spark_dataframe: DataFrame) -> None:
+def load_predefined_components_nodes(spark_dataframe: DataFrame) -> None:
     node_a = (
         spark_dataframe.select("source")
         .withColumnRenamed("source", "id")
@@ -81,7 +81,7 @@ def load_predefined_component_nodes(spark_dataframe: DataFrame) -> None:
         .distinct()
     )
 
-    query_a = """MERGE (:PCNodeA {id: event.source})"""
+    query_a = """MERGE (:PCNodeA {id: event.id})"""
 
     (
         node_a.write.format("org.neo4j.spark.DataSource")
@@ -210,7 +210,7 @@ def load_predefined_components_relationships_in_parallel(
 ) -> List[float]:
     query = """
     MATCH (source:PCNodeA {id: event.source})
-    MATCH (target:PCNodeB {id: event.target})
+    MATCH (target:PCNodeA {id: event.target})
     CREATE (source)-[:HAS_RELATIONSHIP]->(target)
     """
     start = perf_counter()
@@ -230,6 +230,11 @@ def load_predefined_components_relationships_in_parallel(
     )
     return [proc_time, perf_counter() - start]
 
+def validate_relationship_count(neo4j_driver: Driver, expected_count: int) -> None:
+    results, _, _ = neo4j_driver.execute_query("MATCH ()-[:HAS_RELATIONSHIP]->() RETURN count(*) AS relCount")
+    rel_count = results[0]['relCount']
+    print(f"Loaded {rel_count} relationships.")
+    assert rel_count == expected_count
 
 def delete_relationships(neo4j_driver: Driver) -> None:
     query = """

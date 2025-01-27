@@ -64,9 +64,9 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             "nodes": load_monopartite_nodes,
         },
         "predefined_components": {
-            "serial": load_bipartite_relationships_in_serial,  # using bipartite data
+            "serial": load_predefined_components_relationships_in_serial,  
             "parallel": load_predefined_components_relationships_in_parallel,
-            "nodes": load_bipartite_nodes,
+            "nodes": load_predefined_components_nodes,
         },
         "bipartite": {
             "serial": load_bipartite_relationships_in_serial,
@@ -77,7 +77,7 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
 
     # sample_fractions = [0.0001, 0.001, 0.01, 0.1, 1.0]
     
-    sdfs = {0: mp_sdf, 2: bp_sdf, 4: pc_sdf}
+    sdfs = {0: pc_sdf, 2: mp_sdf, 4: bp_sdf}
 
     SAMPLE_SIZES = [125_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000]
     SERIAL_GROUPS = [1]
@@ -86,6 +86,18 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
     PREDEFINED_COMPONENTS_GROUPS = [5, 20]
 
     unsampled_tasks = [
+        {
+            "graph_structure": "predefined_components",
+            "load_strategy": "serial",
+            "num_groups": SERIAL_GROUPS,
+            "dataset_name": DATASET_NAMES.get("predefined_components"),
+        },
+        {
+            "graph_structure": "predefined_components",
+            "load_strategy": "parallel",
+            "num_groups": PREDEFINED_COMPONENTS_GROUPS,
+            "dataset_name": DATASET_NAMES.get("predefined_components"),
+        },
         {
             "graph_structure": "monopartite",
             "load_strategy": "serial",
@@ -109,19 +121,7 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             "load_strategy": "parallel",
             "num_groups": BIPARTITE_GROUPS,
             "dataset_name": DATASET_NAMES.get("bipartite"),
-        },        
-        {
-            "graph_structure": "predefined_components",
-            "load_strategy": "serial",
-            "num_groups": SERIAL_GROUPS,
-            "dataset_name": DATASET_NAMES.get("predefined_components"),
-        },
-        {
-            "graph_structure": "predefined_components",
-            "load_strategy": "parallel",
-            "num_groups": PREDEFINED_COMPONENTS_GROUPS,
-            "dataset_name": DATASET_NAMES.get("predefined_components"),
-        },
+        }, 
     ]
 
     # init new dataframe
@@ -181,12 +181,17 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
                     dataset_name=dataset_name,
                 )
                 print(results_row)
+
+                validate_relationship_count(neo4j_driver=neo4j_driver, expected_count=s)
+                                       
                 results_df = append_results_to_dataframe(results_df, results_row)
 
                 if environment == 'local':
                     save_dataframe(results_df, ts)
                 else:
                     save_dataframe(results_df, ts, spark_session)
+
+
                 # clean up relationships
                 # print("\nDELETING RELATIONSHIPS\n")
                 delete_relationships(neo4j_driver=neo4j_driver)
@@ -212,6 +217,9 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
                     dataset_name=dataset_name,
                 )
                 print(results_row)
+
+                validate_relationship_count(neo4j_driver=neo4j_driver, expected_count=s)
+
                 results_df = append_results_to_dataframe(results_df, results_row)
 
                 if environment == 'local':

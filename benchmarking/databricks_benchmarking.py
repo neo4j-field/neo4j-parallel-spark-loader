@@ -14,8 +14,4 @@ results_df = generate_benchmarks("databricks", "downloaded")
 
 # COMMAND ----------
 
-results_df
-
-# COMMAND ----------
-
 
