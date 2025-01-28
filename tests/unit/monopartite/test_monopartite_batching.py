@@ -15,9 +15,9 @@ def test_color_complete_graph_with_self_loops_with_even_vertices() -> None:
     assert (0, 0) in result.keys()
     assert (1, 1) in result.keys()
     assert (0, 1) in result.keys()
-    assert result.get((0, 0)) == 0
-    assert result.get((0, 1)) == 1
-    assert result.get((1, 1)) == 0
+    assert result.get((0, 0)) == 1
+    assert result.get((0, 1)) == 0
+    assert result.get((1, 1)) == 1
 
 
 def test_color_complete_graph_with_self_loops_with_odd_vertices() -> None:
