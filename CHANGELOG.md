@@ -6,11 +6,20 @@
 
 ### Added
 
-* Methods to generate synthetic data that maps to each ingest method in the package
-* Main method to iterate through parameters and collect benchmarking information for each ingest method in the package
-* Visualizations to easily analyze results
-* Method to partition results by package version automatically
-* Methods to retrieve and format real data for benchmarking scenarios
+## 0.4.0
+
+### Changed
+
+* For monopartite batching assign self loop relationships for two node groups to the same relationship group. Allows for improved efficiency for most real-world monopartite graphs.
+
+### Added
+
+* Benchmarking module including:
+  * Methods to generate synthetic data that maps to each ingest method in the package
+  * Generate_benchmarks method to iterate through parameters and collect benchmarking information for each ingest method in the package
+  * Visualizations to easily analyze results
+  * Method to partition results by package version automatically
+  * Methods to retrieve and format real data for benchmarking scenarios
 
 ## 0.3.1
 
