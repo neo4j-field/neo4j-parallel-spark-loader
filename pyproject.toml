@@ -20,8 +20,17 @@ pytest = "^8.3.4"
 pytest-mock = "^3.12.0"
 python-dotenv = "^1.0.1"
 ruff = "^0.3.0"
+ipykernel = "^6.29.5"
 seaborn = "^0.13.2"
 requests = "^2.32.3"
+
+[tool.poetry.group.benchmarking.dependencies]
+python-dotenv = "^1.0.1"
+ruff = "^0.3.0"
+ipykernel = "^6.29.5"
+toml = "^0.10.2"
+tqdm = "^4.67.1"
+setuptools = "^75.8.0"
 
 [tool.ruff]
 target-version = "py312"

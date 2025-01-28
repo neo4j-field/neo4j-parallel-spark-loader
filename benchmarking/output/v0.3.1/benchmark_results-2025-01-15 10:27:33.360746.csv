@@ -1,0 +1,17 @@
+row_count,graph_structure,load_time,process_time,load_strategy,num_groups,available_cpus_per_node,spark.jars.packages,neo4j_parallel_spark_loader_version,dataset_name,environment,total_time
+10,bipartite,1.4865735830389895,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,1.4865735830389895
+10,bipartite,6.590018290968146,3.9998530839802697,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,10.589871374948416
+10,bipartite,9.569212916016113,2.9749408749630675,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,12.54415379097918
+100,bipartite,1.367064458958339,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,1.367064458958339
+100,bipartite,6.134038500022143,3.1231841249973513,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,9.257222625019494
+100,bipartite,10.174624166975264,2.972419500001706,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,13.14704366697697
+1000,bipartite,1.4381550420075655,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,1.4381550420075655
+1000,bipartite,6.917587834002916,3.3842210409929976,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,10.301808874995913
+1000,bipartite,10.35890529101016,3.366505334037356,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,13.725410625047516
+10000,bipartite,1.5163929170230404,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,1.5163929170230404
+10000,bipartite,9.953834082989488,4.365725875017233,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,14.319559958006721
+10000,bipartite,14.863183875044342,5.048546790960245,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,19.911730666004587
+100000,bipartite,4.088751707982738,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,4.088751707982738
+100000,bipartite,16.61381316598272,9.030625790997874,parallel,3,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,25.644438956980594
+100000,bipartite,19.94885033398168,8.108745959005319,parallel,5,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,28.057596292987
+1000000,bipartite,28.29504195903428,0.0,serial,1,10,org.neo4j:neo4j-connector-apache-spark_2.12:5.1.0_for_spark_3,0.3.1,amazon_ratings,unknown,28.29504195903428

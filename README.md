@@ -67,7 +67,7 @@ Each grouping and batching scenario has its own module. The `group_and_batch_spa
 
 In some relationship data, the relationships can be broken into distinct components based on a field in the relationship data. For example, you might have a DataFrame of HR data with columns for `employeeId`, `managerId`, and `department`. If we are wanting to create a `MANAGES` relationship between employees and managers, and we know in advance that all managers are in the same department as the employees they manage, we can separate the rows of the dataframe into components based on the `department` key.
 
-Often the number of predefined components is greater than the number of workers in the Spark cluster, and the number of rows within each component is unequal. When running `parallel_spark_loader.predefined_components.group_and_batch_spark_dataframe()`, you specify the number of groups that you want to collect the partitioned data into. This value should be equal to the number of workers in your Spark cluster. Neo4j Parallel Spark Loader uses a greedy algorithm to assign partitions into groups in a way that attempts to balance the number of relationships within each group. When loading this ensures that each Spark worker stays equally instead of some workers waiting while other workers finish loading larger groups.
+Often the number of predefined components is greater than the number of workers in the Spark cluster, and the number of rows within each component is unequal. When running `parallel_spark_loader.predefined_components.group_and_batch_spark_dataframe()`, you specify the number of groups that you want to collect the partitioned data into. The optimal number of groups depends on the capacity of your Spark cluster and the Neo4j instance you are loading. As a rule of thumb, the number of groups should be less than or equal to the total number of executor CPUs on your Spark cluster. Neo4j Parallel Spark Loader uses a greedy algorithm to assign partitions into groups in a way that attempts to balance the number of relationships within each group. When loading this ensures that each Spark worker stays equally instead of some workers waiting while other workers finish loading larger groups.
 
 ![Diagram showing nodes and relationships assigned to groups](./docs/assets/images/predefined-components.png)
 
@@ -79,7 +79,7 @@ We can visualize the nodes within the same group as a single aggregated node and
 
 In many relationship datasets, there is not a paritioning key in the Spark DataFrame that can be used to divide the relationships into predefined components. However, we know that no nodes in the dataset will be *both a source and a target* for this relationship type. Often this is because the source nodes and the target nodes have different node labels and they represent different classes of things in the real world. For example, you might have a DataFrame of order data with columns for `orderId`, `productId`, and `quantity`, and you want to create `INCLUDES_PRODUCT` relationships between `Order` and `Product` nodes. You know that all source nodes of `INCLUDES_PRODUCT` relationships will be `Order` nodes, and all target nodes will be `Product` nodes. No nodes will be *both source and target* of that relationship.
 
-When running `parallel_spark_loader.bipartite.group_and_batch_spark_dataframe()`, you specify the number of groups that you want to collect the source and target nodes into. This value should be equal to the number of workers in your Spark cluster. Neo4j Parallel Spark Loader uses a greedy alogrithm to assign source node values to source-node groups so that each group represents roughly the same number of rows in the relationship DataFrame. Similarly, the library groups the target node values into target-node groups with roughly balanced size.
+When running `parallel_spark_loader.bipartite.group_and_batch_spark_dataframe()`, you specify the number of groups that you want to collect the source and target nodes into. The optimal number of node groups depends on the capacity of your Spark cluster and the Neo4j instance you are loading. As a rule of thumb, the number of node groups should be less than or equal to the total number of executor CPUs on your Spark cluster. Neo4j Parallel Spark Loader uses a greedy alogrithm to assign source node values to source-node groups so that each group represents roughly the same number of rows in the relationship DataFrame. Similarly, the library groups the target node values into target-node groups with roughly balanced size.
 
 We can visualize the nodes within the same group as a single aggregated node and the relationships that connect nodes within the same group as a single aggregated relationship. 
 
@@ -93,24 +93,25 @@ In some relationship datasets, the same node is the source node of some relation
 
 When running `parallel_spark_loader.monopartite.group_and_batch_spark_dataframe()`, the library uses the union of the source and target nodes as the basis for assigning nodes to groups. As with other scenarios, you select the number of groups that should be created, and a greedy algorithm assigns node IDs to groups so that the combined number of source and target rows for the IDs in a group is roughly equal. 
 
-As with the other scenarios, you set the number of groups that will be assigned by the algorithm. However, unlike the predefined components and bipartite scenarios, in the monopartite scenario, *it is not recommended that the number of groups equals the number of workers in the Spark cluster*. This is because a group can represent the source of a relationship and the target of a relationship. In the monopartite scenario, it is recommended to set `num_groups = (2 * num_workers) - 1`
+As with the other scenarios, you set the number of groups that will be assigned by the algorithm. The optimal number of groups depends on the resources on the Spark cluster and the Neo4j instance. However, unlike the predefined components and bipartite scenarios, in the monopartite scenario, *the number of node groups should be 2 times the number of parallel transactions that you want to execute*. This is because a group can represent the source of a relationship and the target of a relationship. 
 
 We can visualize the nodes within the same group as a single aggregated node and the relationships that connect nodes within the same group as a single aggregated relationship. 
 
 ![Diagram showing aggregated bipartite relationships colored by group](./docs/assets/images/monopartite-coloring-diagram.png)
 
-In the aggregated biparite diagram, multiple relationships (each representing a group of individual relationships) connect to each node (representing a group of nodes). Because nodes could be either source or target, there are no arrow heads in the diagram representing relationship direction. However, the nodes are always stored with a direction in Neo4j. Using the rotational symmetry of the complete graph, the relationships are colored so that no relationships of the same color connect to the same node. The relationship colors represent the batches applied to the data. In the picture above, the relationship groups represented by red arrows can be processed in parallel because no node groups are connected to more than one red relationship group. After the red batch has completed, each additional color batch can be processed in turn until all relationships have been loaded. Notice that with five node groups, each color batch contains three relationship groups. This demonstrates why the number of groups should be larger than the number of Spark workers that you want to keep occupied.
+In the aggregated monopartite diagram, multiple relationships (each representing a group of individual relationships) connect to each node (representing a group of nodes). Because nodes could be either source or target, there are no arrow heads in the diagram representing relationship direction. However, the nodes are always stored with a direction in Neo4j. Using the rotational symmetry of the complete graph, the relationships are colored so that no relationships of the same color connect to the same node. The relationship colors represent the batches applied to the data. In the picture above, the relationship groups represented by red arrows can be processed in parallel because no node groups are connected to more than one red relationship group. After the red batch has completed, each additional color batch can be processed in turn until all relationships have been loaded. Notice that with five node groups, each color batch contains three relationship groups. This demonstrates why the number of groups should be larger than the number of parallel transactions that you want to execute.
 
 ## Workflow Visualization
 
 The visualization module may be used to create a heatmap of the workflow. 
 
-* Groups are identified as rows and batches are identified as columns. 
-* Batches are displayed sequentially in the order they are processed in.
-* The value in each group & batch pair indicates how many rows are processed in that step.
+* Batches are identified as rows. 
+* Groups that will be processed in a batch are shown as cells in the row.
+* The number of relationships in the relationship group and the relationship group name are shown in each cell.
+* For optimal processing, the number of relationships in each row should be similar.
 
 This function may be imported with `from neo4j_parallel_spark_loader.visualize import create_ingest_heatmap` and takes a Spark DataFrame with columns including `group` and `batch` as input.
 
-Here is an example of a generated heatmap with dummy data:
+Here is an example of a generated heatmap with monopartite data with ten node groups:
 
-![Example heatmap generated with the visualization module](./docs/assets/images/example-heatmap.png)
+![Example heatmap generated with the visualization module](./docs/assets/images/monopartite_heatmap.png)

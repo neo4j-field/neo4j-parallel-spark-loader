@@ -1,0 +1,14 @@
+row_count,graph_structure,load_time,process_time,load_strategy,num_groups,available_cpus_per_node,spark.jars.packages,neo4j_parallel_spark_loader_version,dataset_name,environment,total_time
+2000000,monopartite,211.73726596200004,0.0,serial,1,4,,0.3.1,twitch_gamers,databricks,211.73726596200004
+2000000,monopartite,206.10461809200024,56.27931910899997,parallel,9,4,,0.3.1,twitch_gamers,databricks,262.3839372010002
+2000000,monopartite,199.2052925109997,53.162979710999934,parallel,10,4,,0.3.1,twitch_gamers,databricks,252.36827222199963
+2000000,monopartite,239.66644925899982,51.02339686200003,parallel,19,4,,0.3.1,twitch_gamers,databricks,290.68984612099985
+2000000,monopartite,265.26874402600015,58.373331524999685,parallel,20,4,,0.3.1,twitch_gamers,databricks,323.64207555099983
+4000000,monopartite,477.79267118999996,0.0,serial,1,4,,0.3.1,twitch_gamers,databricks,477.79267118999996
+4000000,monopartite,337.0465079759997,76.50535938199937,parallel,9,4,,0.3.1,twitch_gamers,databricks,413.5518673579991
+4000000,monopartite,290.5212786769998,74.8916917180004,parallel,10,4,,0.3.1,twitch_gamers,databricks,365.41297039500023
+4000000,monopartite,316.487195791,74.06134145099986,parallel,19,4,,0.3.1,twitch_gamers,databricks,390.54853724199984
+4000000,monopartite,332.79803092600014,77.38516841500041,parallel,20,4,,0.3.1,twitch_gamers,databricks,410.18319934100055
+5074915,monopartite,689.201402269,0.0,serial,1,4,,0.3.1,twitch_gamers,databricks,689.201402269
+5074915,monopartite,441.2586452250007,88.24686928400024,parallel,9,4,,0.3.1,twitch_gamers,databricks,529.5055145090009
+5074915,monopartite,379.505431141999,88.19233076400087,parallel,10,4,,0.3.1,twitch_gamers,databricks,467.69776190599987

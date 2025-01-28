@@ -1,0 +1,2 @@
+row_count,graph_structure,load_time,load_strategy,num_groups
+11,bipartite,0.8798769170243759,serial,1
