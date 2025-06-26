@@ -36,7 +36,7 @@ def test_ingest_with_bipartite_spark_dataframe(
                        "HAS_RELATIONSHIP","NodeA","source:id","NodeA","target:id",
                        group_keys=["target"],
                        num_groups=2,
-                       #max_serial=4
+                       max_serial=4
                        )
     
     rels_query = "match (:NodeA)-[r]->() return type(r) as type, r{.*} as props"
