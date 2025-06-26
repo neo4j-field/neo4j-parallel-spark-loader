@@ -16,7 +16,7 @@ def build_relationship(
         target_keys: str,
         rel_props: List[str] = None, 
         group_keys: List[str] = None,
-        num_groups: Optional[int] = None,
+        num_groups: Optional[int] = 10,
         max_serial: Optional[int] = 1000000
         ) -> None:
     
@@ -28,12 +28,10 @@ def build_relationship(
             list of df columns to use as group keys for parallel processing. 
             1 key uses predefined batching, 2 uses bipartite batching
         num_groups: Optional[int] , optional
-            The number of partitions to split Spark DataFrame into.
-            If not provided, then will be calculated.
-            It is more efficient to pass this parameter explicitly. By default None
+            The number of partitions to split Spark DataFrame into. By default 10
         max_serial: Optional[int] , optional
             The maximum number of relationships to process serially.  
-            Any number above this number will be processed in parallel
+            Any number of rows above this number will be processed in parallel
     """
     options = {"relationship": relationship_name,
             "relationship.save.strategy": "keys",
