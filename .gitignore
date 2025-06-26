@@ -174,3 +174,4 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 Neo4j-0f015ca4-Created-2025-01-09.txt
+.vscode/settings.json
