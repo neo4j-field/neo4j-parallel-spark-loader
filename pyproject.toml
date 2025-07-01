@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "neo4j-parallel-spark-loader"
-version = "0.4.0"
+version = "0.5.0"
 description = "Load relationships in parallel into Neo4j using Spark"
-authors = ["Alex Gilmore", "Nathan Smith"]
+authors = ["Alex Gilmore", "Nathan Smith", "Mark Andrews"]
 readme = "README.md"
 
 exclude = ["tests/*", "benchmarking/*", "docs/*", "examples/*", "Makefile"]
