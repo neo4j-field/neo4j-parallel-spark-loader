@@ -10,6 +10,7 @@ def test_ingest_with_bipartite_spark_dataframe(
     bipartite_ingest_options: Dict[str, str],
     spark_fixture: SparkSession,
     healthcheck: None,
+    clear_neo4j_database: None,
 ) -> None:
     ingest_spark_dataframe(
         spark_dataframe=bipartite_spark_dataframe,

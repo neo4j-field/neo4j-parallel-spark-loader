@@ -45,7 +45,7 @@ def relationship_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
 def bipartite_ingest_options() -> Dict[str, str]:
     return {
         "schema.optimization.node.keys": "KEY",
-        "relationship": "HAS_RELATIONSHIP",
+        "relationship": "HAS_BIPARTITE_RELATIONSHIP",
         "relationship.save.strategy": "keys",
         "relationship.source.save.mode": "Overwrite",
         "relationship.source.labels": ":NodeA",

@@ -5,11 +5,12 @@ from pyspark.sql import DataFrame, SparkSession
 from neo4j_parallel_spark_loader.utils.build_relationship import build_relationship
 
 
-def test_ingest_with_bipartite_spark_dataframe(
+def test_build_relationship_with_bipartite_spark_dataframe(
     node_spark_dataframe: DataFrame,
     relationship_spark_dataframe: DataFrame,
     spark_fixture: SparkSession,
-    #healthcheck: None,
+    healthcheck: None,
+    clear_neo4j_database: None,
 ) -> None:
     # Create the nodes first
     nodes_df = (
