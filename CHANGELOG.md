@@ -6,6 +6,10 @@
 
 ### Added
 
+## 0.5.0
+
+### Added
+
 * `build_relationship` function to simplify creating relationships in parallel
 
 ## 0.4.0
