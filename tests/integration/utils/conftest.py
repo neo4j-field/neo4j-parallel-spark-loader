@@ -17,6 +17,7 @@ def bipartite_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
 
     return spark_fixture.createDataFrame(data)
 
+
 @pytest.fixture(scope="function")
 def node_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
     data = [
@@ -24,9 +25,11 @@ def node_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
         {"id": "b"},
         {"id": "c"},
         {"id": "d"},
-        {"id": "e"},]
+        {"id": "e"},
+    ]
 
     return spark_fixture.createDataFrame(data)
+
 
 @pytest.fixture(scope="function")
 def relationship_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:

@@ -33,13 +33,18 @@ def test_build_relationship_with_bipartite_spark_dataframe(
     assert nodes.count() == 5
 
     # Build Relationships
-    build_relationship(relationship_spark_dataframe,
-                       "HAS_RELATIONSHIP","NodeA","source:id","NodeA","target:id",
-                       group_keys=["target"],
-                       num_groups=2,
-                       max_serial=4
-                       )
-    
+    build_relationship(
+        relationship_spark_dataframe,
+        "HAS_RELATIONSHIP",
+        "NodeA",
+        "source:id",
+        "NodeA",
+        "target:id",
+        group_keys=["target"],
+        num_groups=2,
+        max_serial=4,
+    )
+
     rels_query = "match (:NodeA)-[r]->() return type(r) as type, r{.*} as props"
 
     rels: DataFrame = (

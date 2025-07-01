@@ -38,6 +38,7 @@ def healthcheck(neo4j_driver: Driver):
         raise DatabaseError()
     yield
 
+
 @pytest.fixture(scope="function")
 def clear_neo4j_database(neo4j_driver: Driver):
     """Clear the Neo4j database before running IT."""

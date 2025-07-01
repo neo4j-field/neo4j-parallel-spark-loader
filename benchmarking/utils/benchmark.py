@@ -1,8 +1,7 @@
 from datetime import datetime
-from typing import Any, Dict
-from pandas import DataFrame
-from typing import Literal
+from typing import Any, Dict, Literal
 
+from pandas import DataFrame
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import rand
 from tqdm import tqdm
@@ -28,9 +27,11 @@ from benchmarking.utils.spark import (
     load_data_into_spark_dataframe,
 )
 
-def generate_benchmarks(environment: Literal["databricks", "local"],
-                        data_source: Literal["generated", "downloaded"]) -> DataFrame:
-    
+
+def generate_benchmarks(
+    environment: Literal["databricks", "local"],
+    data_source: Literal["generated", "downloaded"],
+) -> DataFrame:
     spark_session: SparkSession = create_spark_session()
     neo4j_driver = create_neo4j_driver()
 
@@ -44,9 +45,15 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             "predefined_components": "generated",
         }
     else:
-        bp_sdf = get_amazon_ratings_bipartite_spark_dataframe(spark_session).orderBy(rand())
-        mp_sdf = get_twitch_gamers_monopartite_spark_dataframe(spark_session).orderBy(rand())
-        pc_sdf = get_reddit_threads_predefined_components_spark_dataframe(spark_session).orderBy(rand())
+        bp_sdf = get_amazon_ratings_bipartite_spark_dataframe(spark_session).orderBy(
+            rand()
+        )
+        mp_sdf = get_twitch_gamers_monopartite_spark_dataframe(spark_session).orderBy(
+            rand()
+        )
+        pc_sdf = get_reddit_threads_predefined_components_spark_dataframe(
+            spark_session
+        ).orderBy(rand())
         DATASET_NAMES = {
             "bipartite": "amazon_ratings",
             "monopartite": "twitch_gamers",
@@ -64,7 +71,7 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             "nodes": load_monopartite_nodes,
         },
         "predefined_components": {
-            "serial": load_predefined_components_relationships_in_serial,  
+            "serial": load_predefined_components_relationships_in_serial,
             "parallel": load_predefined_components_relationships_in_parallel,
             "nodes": load_predefined_components_nodes,
         },
@@ -76,7 +83,7 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
     }
 
     # sample_fractions = [0.0001, 0.001, 0.01, 0.1, 1.0]
-    
+
     sdfs = {0: pc_sdf, 2: mp_sdf, 4: bp_sdf}
 
     SAMPLE_SIZES = [125_000, 250_000, 500_000, 1_000_000, 2_000_000, 4_000_000]
@@ -121,7 +128,7 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
             "load_strategy": "parallel",
             "num_groups": BIPARTITE_GROUPS,
             "dataset_name": DATASET_NAMES.get("bipartite"),
-        }, 
+        },
     ]
 
     # init new dataframe
@@ -156,12 +163,11 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
         fn(sdf)
 
         for s in tqdm(sdf_sample_sizes, desc="sample sizes"):
-
             sampled_sdf: DataFrame = sdf.limit(s)
 
             # SERIAL
             # ------
-  
+
             # load relationships
             load_strategy = unsampled_tasks[idx].get("load_strategy")
             num_groups = unsampled_tasks[idx].get("num_groups")
@@ -183,14 +189,13 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
                 print(results_row)
 
                 validate_relationship_count(neo4j_driver=neo4j_driver, expected_count=s)
-                                       
+
                 results_df = append_results_to_dataframe(results_df, results_row)
 
-                if environment == 'local':
+                if environment == "local":
                     save_dataframe(results_df, ts)
                 else:
                     save_dataframe(results_df, ts, spark_session)
-
 
                 # clean up relationships
                 # print("\nDELETING RELATIONSHIPS\n")
@@ -222,7 +227,7 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
 
                 results_df = append_results_to_dataframe(results_df, results_row)
 
-                if environment == 'local':
+                if environment == "local":
                     save_dataframe(results_df, ts)
                 else:
                     save_dataframe(results_df, ts, spark_session)
@@ -232,7 +237,7 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
                 delete_relationships(neo4j_driver=neo4j_driver)
 
         # refresh database before next graph structure
-        if environment=="databricks":
+        if environment == "databricks":
             # delete all nodes and rels, since can't drop databases yet...
             restore_aura_database(neo4j_driver=neo4j_driver)
         else:
@@ -242,7 +247,3 @@ def generate_benchmarks(environment: Literal["databricks", "local"],
         healthcheck(neo4j_driver=neo4j_driver)
 
     neo4j_driver.close()
-
-
-
-

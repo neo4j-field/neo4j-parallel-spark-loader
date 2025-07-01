@@ -1,7 +1,15 @@
 from typing import Dict, Tuple
 
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import broadcast, col, lit, when, least, greatest, format_string
+from pyspark.sql.functions import (
+    broadcast,
+    col,
+    format_string,
+    greatest,
+    least,
+    lit,
+    when,
+)
 
 
 def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
@@ -24,8 +32,13 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     spark: SparkSession = spark_dataframe.sparkSession
 
     group_count = (
-        spark_dataframe.select("source_group").withColumnRenamed("source_group", "group")
-        .union(spark_dataframe.select("target_group").withColumnRenamed("target_group", "group"))
+        spark_dataframe.select("source_group")
+        .withColumnRenamed("source_group", "group")
+        .union(
+            spark_dataframe.select("target_group").withColumnRenamed(
+                "target_group", "group"
+            )
+        )
         .distinct()
         .count()
     )
@@ -42,26 +55,27 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
         other=broadcast(coloring_df),
         on=(spark_dataframe.group == coloring_df.group),
         how="left",  # Use left join to keep all records from spark_dataframe
-    ).drop(
-        coloring_df.group
-    )
+    ).drop(coloring_df.group)
 
     # Regroup self loops for even group_count
     if group_count % 2 == 0:
-        self_loop_pair = (col("source_group") + lit(group_count//2)) % lit(group_count)
-    
+        self_loop_pair = (col("source_group") + lit(group_count // 2)) % lit(
+            group_count
+        )
+
         # Create the new group string for self-loops
         self_loop_string = format_string(
             "self-loops %d and %d",
             least(col("source_group"), self_loop_pair),
-            greatest(col("source_group"), self_loop_pair)
+            greatest(col("source_group"), self_loop_pair),
         )
-    
+
         # Apply the transformation only when source_group equals target_group
         result_df = result_df.withColumn(
             "group",
-            when(col("source_group") == col("target_group"), self_loop_string)
-            .otherwise(col("group"))
+            when(
+                col("source_group") == col("target_group"), self_loop_string
+            ).otherwise(col("group")),
         )
 
     result_df = result_df.drop(result_df.source_group, result_df.target_group)
@@ -122,7 +136,6 @@ def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:
             v2 = start
             _step_through_edges(v1, v2, (n // 2) + 1, current_color)
             current_color += 1
-            
 
     # odd number of nodes
     else:

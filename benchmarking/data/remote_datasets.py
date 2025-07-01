@@ -6,7 +6,13 @@ from zipfile import ZipFile
 import pandas as pd
 import requests
 from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.types import FloatType, IntegerType, StringType, StructField, StructType
+from pyspark.sql.types import (
+    FloatType,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+)
 
 SCHEMAS = {
     "amazon_ratings": StructType(
@@ -61,9 +67,11 @@ def get_amazon_ratings_bipartite_spark_dataframe(
         content = file.read().decode("utf-8")
         # Create RDD from content
         rdd = spark_session.sparkContext.parallelize(content.splitlines())
-        
+
         # Convert RDD to DataFrame with schema
-        rating_df = spark_session.read.csv(rdd, schema=SCHEMAS.get("amazon_ratings"), header=False)
+        rating_df = spark_session.read.csv(
+            rdd, schema=SCHEMAS.get("amazon_ratings"), header=False
+        )
 
     return rating_df
 
@@ -81,15 +89,16 @@ def get_twitch_gamers_monopartite_spark_dataframe(
     with zip_file.open(FILE_NAMES.get(K)) as file:
         # Convert to string buffer for Spark to read
         content = file.read().decode("utf-8")
-        
+
         lines = content.splitlines()[1:]
         rdd = spark_session.sparkContext.parallelize(lines)
 
         # Convert RDD to DataFrame with schema
-        twitch_df = spark_session.read.csv(rdd, schema=SCHEMAS.get("twitch_gamers"), header=False)
+        twitch_df = spark_session.read.csv(
+            rdd, schema=SCHEMAS.get("twitch_gamers"), header=False
+        )
 
     return twitch_df
-
 
 
 def get_reddit_threads_predefined_components_spark_dataframe(
@@ -111,7 +120,9 @@ def get_reddit_threads_predefined_components_spark_dataframe(
             for t in data.items()
             for sublist in t[1]
         ]
-        
-    reddit_df = spark_session.createDataFrame(flattened, schema=SCHEMAS.get("reddit_threads"))
+
+    reddit_df = spark_session.createDataFrame(
+        flattened, schema=SCHEMAS.get("reddit_threads")
+    )
 
     return reddit_df

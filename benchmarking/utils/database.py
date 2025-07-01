@@ -46,6 +46,7 @@ def load_bipartite_nodes(spark_dataframe: DataFrame) -> None:
         .save()
     )
 
+
 def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
     node_a = (
         spark_dataframe.select("source")
@@ -67,6 +68,7 @@ def load_monopartite_nodes(spark_dataframe: DataFrame) -> None:
         .option("query", query_a)
         .save()
     )
+
 
 def load_predefined_components_nodes(spark_dataframe: DataFrame) -> None:
     node_a = (
@@ -129,6 +131,7 @@ def load_monopartite_relationships_in_serial(
         .save()
     )
     return [0.0, perf_counter() - start]
+
 
 def load_predefined_components_relationships_in_serial(
     spark_dataframe: DataFrame, num_groups: Optional[int] = None
@@ -230,11 +233,15 @@ def load_predefined_components_relationships_in_parallel(
     )
     return [proc_time, perf_counter() - start]
 
+
 def validate_relationship_count(neo4j_driver: Driver, expected_count: int) -> None:
-    results, _, _ = neo4j_driver.execute_query("MATCH ()-[:HAS_RELATIONSHIP]->() RETURN count(*) AS relCount")
-    rel_count = results[0]['relCount']
+    results, _, _ = neo4j_driver.execute_query(
+        "MATCH ()-[:HAS_RELATIONSHIP]->() RETURN count(*) AS relCount"
+    )
+    rel_count = results[0]["relCount"]
     print(f"Loaded {rel_count} relationships.")
     assert rel_count == expected_count
+
 
 def delete_relationships(neo4j_driver: Driver) -> None:
     query = """
@@ -251,6 +258,7 @@ def restore_database(neo4j_driver: Driver) -> None:
     with neo4j_driver.session() as session:
         session.run(script)
 
+
 def restore_aura_database(neo4j_driver: Driver) -> None:
     node_delete_query = """
 MATCH (n)
@@ -263,4 +271,3 @@ DELETE n
     records, _, _ = neo4j_driver.execute_query("SHOW CONSTRAINTS YIELD name")
     for record in records:
         neo4j_driver.execute_query(f"DROP CONSTRAINT {record['name']}")
-    
