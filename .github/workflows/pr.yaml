@@ -59,8 +59,7 @@ jobs:
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: poetry install --no-interaction --no-cache --with dev --all-extras
-      - name: Clear Poetry cache
-        run: poetry cache clear --all .
+
       - name: Run tests
         shell: bash
         run: make test

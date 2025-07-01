@@ -18,7 +18,7 @@ TIME_TITLES = {
 }
 
 SAMPLE_SIZES = [1_000_000, 2_000_000, 3_000_000, 4_000_000, 5_000_000, 6_000_000]
-SAMPLE_LABELS = ['1M', '2M', '3M', '4M', '5M', '6M']
+SAMPLE_LABELS = ["1M", "2M", "3M", "4M", "5M", "6M"]
 
 
 def create_row_count_v_load_time_line_plot(dataframe: pd.DataFrame) -> Axes:
@@ -34,7 +34,7 @@ def create_row_count_v_load_time_line_plot(dataframe: pd.DataFrame) -> Axes:
     ax.set_ylabel("Load Time (s)")
     ax.set_title("Serial vs. Parallel Ingest Using Spark")
     sns.move_legend(ax, "upper left", bbox_to_anchor=(1, 1))
-    #plt.xscale("log")
+    # plt.xscale("log")
     tick_locations = SAMPLE_SIZES
     tick_labels = SAMPLE_LABELS
     plt.xticks(tick_locations, tick_labels, rotation=45)
@@ -42,22 +42,22 @@ def create_row_count_v_load_time_line_plot(dataframe: pd.DataFrame) -> Axes:
 
 
 def create_num_groups_v_time_bar_plot(dataframe: pd.DataFrame, time_col: str) -> Axes:
-    hue_order = dataframe[dataframe["load_strategy"] == "parallel"]["num_groups"].drop_duplicates().sort_values()
+    hue_order = (
+        dataframe[dataframe["load_strategy"] == "parallel"]["num_groups"]
+        .drop_duplicates()
+        .sort_values()
+    )
     # Define the mapping for abbreviated labels
-    label_map = {
-        "predefined_components": "pdc",
-        "bipartite": "bp",
-        "monopartite": "mp"
-    }
+    label_map = {"predefined_components": "pdc", "bipartite": "bp", "monopartite": "mp"}
     sns.set_theme()
     row_counts = dataframe["row_count"].drop_duplicates().sort_values()
-    fig, axes = plt.subplots(1, len(row_counts)-3, figsize=(15, 5), sharey=True)
+    fig, axes = plt.subplots(1, len(row_counts) - 3, figsize=(15, 5), sharey=True)
     for idx, s in enumerate(row_counts[:-3]):
         ax = sns.barplot(
             ax=axes[idx],
             data=dataframe[
-                (dataframe["load_strategy"] == "parallel")& 
-                (dataframe["row_count"] == s)
+                (dataframe["load_strategy"] == "parallel")
+                & (dataframe["row_count"] == s)
             ],
             x="graph_structure",
             y=time_col,
@@ -66,7 +66,9 @@ def create_num_groups_v_time_bar_plot(dataframe: pd.DataFrame, time_col: str) ->
         )
         ax.set_title(str(s) + " Samples")
         ax.set_xlabel("Graph Structure")
-        ax.set_xticklabels([label_map[label.get_text()] for label in ax.get_xticklabels()])
+        ax.set_xticklabels(
+            [label_map[label.get_text()] for label in ax.get_xticklabels()]
+        )
 
         if idx == 0:
             try:
@@ -132,14 +134,14 @@ def create_time_v_row_count_for_graph_structure_line_plot(
             ax=axes[idx],
             data=dataframe[
                 (dataframe["graph_structure"] == graph_structure)
-                #& (dataframe["num_groups"].isin([1, 3]))
+                # & (dataframe["num_groups"].isin([1, 3]))
             ],
             x="row_count",
             y=s,
             hue="load_strategy",
             style="num_groups",
         )
-        #ax.set_xscale("log")
+        # ax.set_xscale("log")
         sns.lineplot(
             ax=axes[idx],
             data=dataframe[
@@ -150,7 +152,7 @@ def create_time_v_row_count_for_graph_structure_line_plot(
             y=s,
             hue="load_strategy",
         )
-        #ax.set_xscale("log")
+        # ax.set_xscale("log")
         sns.lineplot(
             ax=axes[idx],
             data=dataframe[
@@ -164,7 +166,7 @@ def create_time_v_row_count_for_graph_structure_line_plot(
         ax.set_title(TIME_TITLES.get(s))
         # ax.set_xticklabels(["Preprocess", "Load", "Total"])
         ax.set_xlabel("Row Count")
-        #ax.set_xscale("log")
+        # ax.set_xscale("log")
         ax.set_xticks(SAMPLE_SIZES)
         ax.set_xticklabels(SAMPLE_LABELS)
 

@@ -37,3 +37,10 @@ def healthcheck(neo4j_driver: Driver):
     if not success:
         raise DatabaseError()
     yield
+
+
+@pytest.fixture(scope="function")
+def clear_neo4j_database(neo4j_driver: Driver):
+    """Clear the Neo4j database before running IT."""
+    with neo4j_driver.session() as session:
+        session.run("match (n) detach delete n")

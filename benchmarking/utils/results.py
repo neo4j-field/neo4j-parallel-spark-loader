@@ -89,7 +89,9 @@ def get_package_version() -> str:
         return config["tool"]["poetry"]["version"]
 
 
-def save_dataframe(dataframe: pd.DataFrame, ts: str, spark: Optional[SparkSession] = None) -> None:
+def save_dataframe(
+    dataframe: pd.DataFrame, ts: str, spark: Optional[SparkSession] = None
+) -> None:
     version = "v" + get_package_version()
 
     path = f"./output/{version}"
@@ -99,7 +101,5 @@ def save_dataframe(dataframe: pd.DataFrame, ts: str, spark: Optional[SparkSessio
 
     file_path = f"{path}/benchmark_results-{ts}.csv"
     dataframe.to_csv(file_path, index=False)
-    
-    print(file_path)
 
-    
+    print(file_path)

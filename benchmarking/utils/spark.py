@@ -17,7 +17,7 @@ def create_spark_session(
     """
     print(f"URI: {neo4j_uri or os.environ.get('NEO4J_URI', 'neo4j://localhost:7687')}")
     print(f"USERNAME: {neo4j_username or os.environ.get('NEO4J_USERNAME', 'neo4j')}")
-    #print(f"PASSWORD: {neo4j_password or os.environ.get('NEO4J_PASSWORD', 'password')}")
+    # print(f"PASSWORD: {neo4j_password or os.environ.get('NEO4J_PASSWORD', 'password')}")
     print(f"DATABASE: {neo4j_database or os.environ.get('NEO4J_DATABASE', 'neo4j')}")
 
     return (

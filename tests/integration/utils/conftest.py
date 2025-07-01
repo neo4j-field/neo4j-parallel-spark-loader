@@ -19,10 +19,36 @@ def bipartite_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
 
 
 @pytest.fixture(scope="function")
+def node_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
+    data = [
+        {"id": "a"},
+        {"id": "b"},
+        {"id": "c"},
+        {"id": "d"},
+        {"id": "e"},
+    ]
+
+    return spark_fixture.createDataFrame(data)
+
+
+@pytest.fixture(scope="function")
+def relationship_spark_dataframe(spark_fixture: SparkSession) -> DataFrame:
+    data = [
+        {"source": "a", "target": "c", "prop": 0},
+        {"source": "a", "target": "d", "prop": 1},
+        {"source": "b", "target": "c", "prop": 2},
+        {"source": "b", "target": "d", "prop": 3},
+        {"source": "b", "target": "e", "prop": 4},
+    ]
+
+    return spark_fixture.createDataFrame(data)
+
+
+@pytest.fixture(scope="function")
 def bipartite_ingest_options() -> Dict[str, str]:
     return {
         "schema.optimization.node.keys": "KEY",
-        "relationship": "HAS_RELATIONSHIP",
+        "relationship": "HAS_BIPARTITE_RELATIONSHIP",
         "relationship.save.strategy": "keys",
         "relationship.source.save.mode": "Overwrite",
         "relationship.source.labels": ":NodeA",

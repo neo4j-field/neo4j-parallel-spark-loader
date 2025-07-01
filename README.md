@@ -115,3 +115,34 @@ This function may be imported with `from neo4j_parallel_spark_loader.visualize i
 Here is an example of a generated heatmap with monopartite data with ten node groups:
 
 ![Example heatmap generated with the visualization module](./docs/assets/images/monopartite_heatmap.png)
+
+## Simplified Relationship Building
+
+The `build_relationship` function is designed to simplify the process of building relationships in parallel. It only takes a few simple parameters.
+
+* The DataFrame to process
+* The name of the Relationship
+* The source and target node labels and id properties
+* Optional Relationship properties
+* The group keys to be used for grouping
+
+The function uses the size of the DataFrame to decide whether to process in parallel or serially.  The threshold can be set by passing in `max_serial` which defaults to 1,000,000 rows.  
+
+It also decides which grouping methodology to use based on the number of `group_keys` that given.  Passing in a single key will result in a `predefined` grouping while passing 2 keys in will result in a `bipartite` grouping.  `monopartite` is not yet supported.
+
+The function assumes a `num_groups` of 10 for the grouping and ingestion calls.  This can also be overwritten by passing the desired value to `num_groups`
+
+This function may be imported with `from neo4j_parallel_spark_loader import build_relationship`
+
+Example Code Snippet
+
+```
+    build_relationship(df,
+                       "INCLUDES_PRODUCT",
+                       "Order","order_id",
+                       "Product","product_id",
+                       group_keys=["product_id"],
+                       rel_props=["quantity"]
+                       )
+
+```
