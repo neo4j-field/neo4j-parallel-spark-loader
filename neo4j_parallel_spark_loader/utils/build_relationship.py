@@ -70,7 +70,8 @@ def build_relationship(
     else:
         print("Building in series")
         df = (
-            df.write.format("org.neo4j.spark.DataSource")
+            df.coalesce(1)
+            .write.format("org.neo4j.spark.DataSource")
             .mode("Overwrite")
             .options(**options)
             .save()
