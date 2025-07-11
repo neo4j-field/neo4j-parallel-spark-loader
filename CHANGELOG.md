@@ -1,6 +1,7 @@
 ## Next
 
 ### Fixed
+* fix `build_relationship` function where serial relationship loading was loading in parallel
 
 ### Changed
 
