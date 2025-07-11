@@ -1,18 +1,28 @@
 ## Next
 
 ### Fixed
+* fix `build_relationship` function where serial relationship loading was loading in parallel
 
 ### Changed
 
 ### Added
 
-## 0.5.0
+## v0.5.1
+
+### Fixed
+* fix `build_relationship` function where serial relationship loading was loading in parallel
+
+### Changed
+
+### Added
+
+## v0.5.0
 
 ### Added
 
 * `build_relationship` function to simplify creating relationships in parallel
 
-## 0.4.0
+## v0.4.0
 
 ### Changed
 
@@ -27,13 +37,13 @@
   * Method to partition results by package version automatically
   * Methods to retrieve and format real data for benchmarking scenarios
 
-## 0.3.1
+## v0.3.1
 
 ### Changed
 
 * Make `num_groups` optional parameter in ingest function. Allows for improved performance. 
 
-## 0.3.0
+## v0.3.0
 
 ### Changed
 
@@ -47,13 +57,13 @@
 
 * Examples demonstrating each parallel ingest method with real data
 
-## 0.2.4
+## v0.2.4
 
 ### Fixed
 
 * Fixed delimiter in generated group ID to be consistent between group and batch processes in monopartite
 
-## 0.2.3
+## v0.2.3
 
 ### Fixed
 
@@ -63,20 +73,20 @@
 
 * Added additional tests for monopartite batching 
 
-## 0.2.2
+## v0.2.2
 
 ### Fixed
 
 * update how `num_groups` in ingest function is calculated internally 
 
-## 0.2.1
+## v0.2.1
 
 ### Fixed
 
 * Fix monopartite batch assignment bug
 * Fix bug in ingest where partitioning was not performed according to defined groups
 
-## 0.2.0
+## v0.2.0
 
 ### Added
 
@@ -86,6 +96,6 @@
 * Add heatmap visualization module
 * Add example notebook demonstrating the heatmap module and updated README.md
 
-## 0.1.1
+## v0.1.1
 
 * Initial release and imports update 
