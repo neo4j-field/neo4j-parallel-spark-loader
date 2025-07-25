@@ -3,17 +3,18 @@
 ### Fixed
 
 ### Changed
-* `verify_spark` function now warns instead of raising assertion error if not using Spark v3.4.0 or greater
+
 ### Added
+
+## v0.5.2
+
+### Changed
+* `verify_spark` function now warns instead of raising assertion error if not using Spark v3.4.0 or greater
 
 ## v0.5.1
 
 ### Fixed
 * fix `build_relationship` function where serial relationship loading was loading in parallel
-
-### Changed
-
-### Added
 
 ## v0.5.0
 
