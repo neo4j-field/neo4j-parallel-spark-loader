@@ -3,6 +3,8 @@ Neo4j Parallel Spark Loader is a Python library for grouping and batching datafr
 
 Neo4j Parallel Spark Loader allows parallel relationship writes to Neo4j without deadlocking by breaking a Spark dataframe into one or more batches of rows. Within each batch, rows are further subdivided into groups in such a way that each node ID value appears in only one group per batch. All groups within a batch can be written to Neo4j in parallel without deadlocking because the same node is never touched by relationships in concurrent write transactions. Batches are loaded one-after-the-other to ingest the whole dataframe to Neo4j.
 
+*Note: This package was developed with Spark v3.4.0. It is recommended to use this version of Spark.*
+
 ## Key Features
 Supports multiple relationship batching and grouping scenarios:
 * Predefined Components
