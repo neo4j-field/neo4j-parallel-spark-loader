@@ -8,4 +8,4 @@ def verify_spark_version(spark_session: SparkSession) -> None:
     It may work with other versions, but it is not guaranteed.
     """
 
-    if spark_session.version >= "3.4.0": warnings.warn("It is recommended to use Spark version >= 3.4.0")
+    if spark_session.version < "3.4.0": warnings.warn("It is recommended to use Spark version >= 3.4.0")
