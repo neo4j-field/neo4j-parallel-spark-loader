@@ -19,3 +19,20 @@ def test_create_ingest_batches_from_groups(
     result = create_ingest_batches_from_groups(spark_dataframe=sdf)
 
     assert result.agg({"batch": "max"}).first()[0] + 1 <= num_colors
+
+
+def test_create_ingest_batches_from_groups_known_group_count(
+    spark_fixture: SparkSession, bipartite_batching_data: List[Dict[str, int]]
+) -> None:
+    sdf: DataFrame = spark_fixture.createDataFrame(
+        bipartite_batching_data, ["source_group", "target_group"]
+    )
+
+    without_known_count = create_ingest_batches_from_groups(
+        spark_dataframe=sdf
+    ).orderBy("source_group", "target_group")
+    with_known_count = create_ingest_batches_from_groups(
+        spark_dataframe=sdf, known_group_count=4
+    ).orderBy("source_group", "target_group")
+
+    assert without_known_count.collect() == with_known_count.collect()
