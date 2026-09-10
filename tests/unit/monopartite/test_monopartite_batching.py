@@ -82,3 +82,18 @@ def test_create_ingest_batches_from_groups_no_duplicate_group_rels(
     )[0]["max_distinct_count"]
 
     assert max_batch_st_group_count == 1
+
+
+def test_create_ingest_batches_from_groups_known_group_count(
+    spark_fixture: SparkSession, monopartite_dupe_batching_data: List[Dict[str, int]]
+) -> None:
+    sdf = spark_fixture.createDataFrame(monopartite_dupe_batching_data)
+
+    without_known_count = create_ingest_batches_from_groups(
+        spark_dataframe=sdf
+    ).orderBy("source_group", "target_group")
+    with_known_count = create_ingest_batches_from_groups(
+        spark_dataframe=sdf, known_group_count=7
+    ).orderBy("source_group", "target_group")
+
+    assert without_known_count.collect() == with_known_count.collect()
