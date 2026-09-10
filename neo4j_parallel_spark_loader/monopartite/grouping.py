@@ -1,9 +1,12 @@
+from typing import Literal
+
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import concat, greatest, least, lit
 
 from ..utils.grouping import (
     create_value_groupings,
 )
+from ..utils.hash_grouping import hash_group_column
 from ..utils.verify_spark import verify_spark_version
 
 
@@ -12,6 +15,7 @@ def create_node_groupings(
     source_col: str,
     target_col: str,
     num_groups: int,
+    strategy: Literal["greedy", "hash"] = "greedy",
 ) -> DataFrame:
     """
     Create node groupings for parallel ingest into Neo4j.
@@ -29,6 +33,17 @@ def create_node_groupings(
         The column indicating the relationship target id.
     num_groups : int
         The desired number of groups to generate. The process may generate less groups as necessary.
+    strategy : Literal["greedy", "hash"], optional
+        The grouping strategy to use. By default "greedy".
+        "greedy" collects distinct id counts (combining source and target ids) to the driver
+        and greedily bin-packs them into balanced groups. This scales poorly with the number
+        of distinct ids and can OOM the driver on very large datasets.
+        "hash" assigns each row's `source_group`/`target_group` using `hash(id) % num_groups`
+        entirely within Spark, with no driver collect and no join. The same expression is
+        applied to `source_col` and `target_col` so a node ID lands in the same group whether
+        it appears as a source or a target. It scales to very large datasets but does not
+        balance group sizes, so a small number of extremely high-degree ids (supernodes) can
+        produce unbalanced groups. `null` ids are assigned a `null` group under both strategies.
 
     Returns
     -------
@@ -37,6 +52,22 @@ def create_node_groupings(
     """
 
     verify_spark_version(spark_session=spark_dataframe.sparkSession)
+
+    if strategy == "hash":
+        final_sdf = spark_dataframe.withColumn(
+            "source_group", hash_group_column(source_col, num_groups)
+        ).withColumn("target_group", hash_group_column(target_col, num_groups))
+
+        final_sdf = final_sdf.withColumn(
+            "group",
+            concat(
+                least("source_group", "target_group"),
+                lit(" -- "),
+                greatest("source_group", "target_group"),
+            ),
+        )
+
+        return final_sdf
 
     # stack source and target
     # group by and count
