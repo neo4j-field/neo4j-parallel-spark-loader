@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pyspark.sql import DataFrame
 
@@ -22,6 +22,7 @@ def build_relationship(
     group_keys: List[str] = None,
     num_groups: Optional[int] = 10,
     max_serial: Optional[int] = 1000000,
+    strategy: Literal["greedy", "hash"] = "greedy",
 ) -> None:
     """Build a relationship between two nodes.
     Params:
@@ -35,6 +36,11 @@ def build_relationship(
         max_serial: Optional[int] , optional
             The maximum number of relationships to process serially.
             Any number of rows above this number will be processed in parallel
+        strategy: Literal["greedy", "hash"], optional
+            The grouping strategy to use. "greedy" balances group sizes but collects
+            distinct id counts to the driver and does not scale to very large datasets.
+            "hash" computes group assignments entirely in Spark and scales to very large
+            datasets, at the cost of not balancing group sizes. By default "greedy"
     """
     options = {
         "relationship": relationship_name,
@@ -54,11 +60,13 @@ def build_relationship(
         print("Building in parallel")
         if len(group_keys) == 1:
             print("Using Predefined Grouping")
-            batched_df = group_and_batch_predefined(df, group_keys[0], num_groups)
+            batched_df = group_and_batch_predefined(
+                df, group_keys[0], num_groups, strategy=strategy
+            )
         else:
             print("Using Bipartite Grouping")
             batched_df = group_and_batch_bipartite(
-                df, group_keys[0], group_keys[1], num_groups
+                df, group_keys[0], group_keys[1], num_groups, strategy=strategy
             )
 
         ingest_spark_dataframe(
