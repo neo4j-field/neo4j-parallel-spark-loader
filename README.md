@@ -103,6 +103,25 @@ We can visualize the nodes within the same group as a single aggregated node and
 
 In the aggregated monopartite diagram, multiple relationships (each representing a group of individual relationships) connect to each node (representing a group of nodes). Because nodes could be either source or target, there are no arrow heads in the diagram representing relationship direction. However, the nodes are always stored with a direction in Neo4j. Using the rotational symmetry of the complete graph, the relationships are colored so that no relationships of the same color connect to the same node. The relationship colors represent the batches applied to the data. In the picture above, the relationship groups represented by red arrows can be processed in parallel because no node groups are connected to more than one red relationship group. After the red batch has completed, each additional color batch can be processed in turn until all relationships have been loaded. Notice that with five node groups, each color batch contains three relationship groups. This demonstrates why the number of groups should be larger than the number of parallel transactions that you want to execute.
 
+## Grouping strategies
+
+Each scenario's `create_node_groupings`/`group_and_batch_spark_dataframe` function accepts a `strategy` parameter: `"greedy"` (the default) or `"hash"`.
+
+* **`greedy`** groups node IDs so that each group represents roughly the same number of rows. To do this, it counts every distinct node ID on the driver and runs a single-threaded bin-packing pass over that list before joining the result back onto the DataFrame. This produces well-balanced groups, but the driver-side count/collect/join steps do not scale to datasets with a very large number of distinct node IDs, and can exhaust driver memory.
+* **`hash`** assigns each row's group with `hash(id) % num_groups`, computed entirely within Spark. There is no driver collect and no join, so it scales to arbitrarily large datasets. The tradeoff is that group sizes are not balanced by row count -- they are only as balanced as the hash distribution of the ID values happens to be.
+
+Use `hash` when you have a very large number of distinct node IDs and greedy grouping is too slow or is exhausting driver memory. Prefer `greedy` (the default) when the dataset is small enough for the driver to handle, or when a small number of "supernode" IDs account for a disproportionate share of the rows -- since `hash` does not balance for this, a supernode's rows can pile up in whichever groups its ID happens to hash into, creating a slow, unbalanced batch. Check your data's degree distribution (for example, the top 50 node IDs by row count) before choosing `hash` on data you suspect may have supernodes.
+
+`null` node IDs (or, for predefined components, a `null` partition value) are assigned a `null` group under both strategies.
+
+```
+from neo4j_parallel_spark_loader.bipartite import group_and_batch_spark_dataframe
+
+batched_purchase_df = group_and_batch_spark_dataframe(
+    purchase_df, "customer_id", "store_id", 8, strategy="hash"
+)
+```
+
 ## Workflow Visualization
 
 The visualization module may be used to create a heatmap of the workflow. 
