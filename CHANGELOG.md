@@ -2,6 +2,8 @@
 
 ### Fixed
 
+* Bump `fonttools`, `idna`, `pillow`, `pygments`, `pytest`, `python-dotenv`, `requests`, `setuptools`, `tornado`, and `urllib3` to patched versions in `poetry.lock`, resolving 45 open Dependabot alerts. All are transitive dependencies of the `dev`/`benchmarking` Poetry groups (via `ipykernel`, `seaborn`, `requests`, `neo4j`); none are runtime dependencies of the published package.
+
 ### Changed
 
 ### Added
