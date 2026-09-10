@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pyspark.sql import DataFrame
 
 from ..utils.grouping import (
@@ -5,11 +7,16 @@ from ..utils.grouping import (
     create_value_counts_dataframe,
     create_value_groupings,
 )
+from ..utils.hash_grouping import hash_group_column
 from ..utils.verify_spark import verify_spark_version
 
 
 def create_node_groupings(
-    spark_dataframe: DataFrame, source_col: str, target_col: str, num_groups: int
+    spark_dataframe: DataFrame,
+    source_col: str,
+    target_col: str,
+    num_groups: int,
+    strategy: Literal["greedy", "hash"] = "greedy",
 ) -> DataFrame:
     """
     Create node groupings for parallel ingest into Neo4j.
@@ -26,6 +33,16 @@ def create_node_groupings(
         The column indicating the relationship target id.
     num_groups : int
         The desired number of groups to generate. The process may generate less groups as necessary.
+    strategy : Literal["greedy", "hash"], optional
+        The grouping strategy to use. By default "greedy".
+        "greedy" collects distinct source/target id counts to the driver and greedily
+        bin-packs them into balanced groups. This scales poorly with the number of distinct
+        ids and can OOM the driver on very large datasets.
+        "hash" assigns each row's `source_group`/`target_group` using `hash(id) % num_groups`
+        entirely within Spark, with no driver collect and no join. It scales to very large
+        datasets but does not balance group sizes, so a small number of extremely
+        high-degree ids (supernodes) can produce unbalanced groups. `null` ids are assigned a
+        `null` group under both strategies.
 
     Returns
     -------
@@ -34,6 +51,13 @@ def create_node_groupings(
     """
 
     verify_spark_version(spark_session=spark_dataframe.sparkSession)
+
+    if strategy == "hash":
+        final_sdf = spark_dataframe.withColumn(
+            "source_group", hash_group_column(source_col, num_groups)
+        ).withColumn("target_group", hash_group_column(target_col, num_groups))
+
+        return create_group_column_from_source_and_target_groups(final_sdf)
 
     # to create buckets
     # run over source and target INDEPENDENTLY
