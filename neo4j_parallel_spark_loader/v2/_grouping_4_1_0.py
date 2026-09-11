@@ -334,7 +334,7 @@ def group_and_batch_spark_dataframe(
 
     # 1. Batch the dataframe
 
-    batched = group_and_batch_spark_dataframe(peopleDf, source_col="idNumber", target_col="customerNumber", num_groups=100, batch_size=5000)
+    batched = group_and_batch_spark_dataframe(peopleDf, source_col="idNumber", target_col="targetId", num_groups=100, batch_size=5000)
 
     # 2. Ingest the dataframe nodes only
 
