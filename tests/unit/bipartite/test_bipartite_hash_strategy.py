@@ -101,3 +101,22 @@ def test_group_and_batch_spark_dataframe_hash_strategy_deterministic(
     )
 
     assert first_result == second_result
+
+
+@pytest.mark.parametrize("strategy", ["greedy", "hash"])
+def test_null_node_id_yields_null_group_and_batch(
+    spark_fixture: SparkSession, strategy: str
+) -> None:
+    sdf = spark_fixture.createDataFrame(
+        [(1, 6), (2, 7), (None, 8), (3, None)],
+        "source_node int, target_node int",
+    )
+
+    result = group_and_batch_spark_dataframe(
+        sdf, "source_node", "target_node", 4, strategy=strategy
+    ).collect()
+
+    for row in result:
+        has_null_id = row["source_node"] is None or row["target_node"] is None
+        assert (row["group"] is None) == has_null_id
+        assert (row["batch"] is None) == has_null_id

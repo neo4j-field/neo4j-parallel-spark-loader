@@ -112,7 +112,7 @@ Each scenario's `create_node_groupings`/`group_and_batch_spark_dataframe` functi
 
 Use `hash` when you have a very large number of distinct node IDs and greedy grouping is too slow or is exhausting driver memory. Prefer `greedy` (the default) when the dataset is small enough for the driver to handle, or when a small number of "supernode" IDs account for a disproportionate share of the rows -- since `hash` does not balance for this, a supernode's rows can pile up in whichever groups its ID happens to hash into, creating a slow, unbalanced batch. Check your data's degree distribution (for example, the top 50 node IDs by row count) before choosing `hash` on data you suspect may have supernodes.
 
-`null` node IDs (or, for predefined components, a `null` partition value) are assigned a `null` group under both strategies.
+`null` node IDs (or, for predefined components, a `null` partition value) are assigned a `null` group under both strategies. Because the group is `null`, the batch is `null` as well, and these rows cannot be loaded as relationships. `ingest_spark_dataframe()` counts them before writing and raises a `ValueError` by default; pass `on_null_batch="skip"` to emit a warning and ingest the remaining rows instead.
 
 ```
 from neo4j_parallel_spark_loader.bipartite import group_and_batch_spark_dataframe

@@ -1,7 +1,7 @@
 from typing import Literal
 
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import concat, greatest, least, lit
+from pyspark.sql.functions import col, concat, greatest, least, lit, when
 
 from ..utils.grouping import (
     create_value_groupings,
@@ -43,7 +43,8 @@ def create_node_groupings(
         applied to `source_col` and `target_col` so a node ID lands in the same group whether
         it appears as a source or a target. It scales to very large datasets but does not
         balance group sizes, so a small number of extremely high-degree ids (supernodes) can
-        produce unbalanced groups. `null` ids are assigned a `null` group under both strategies.
+        produce unbalanced groups. A row with a `null` id on either side is assigned a `null`
+        `group` under both strategies.
 
     Returns
     -------
@@ -58,16 +59,7 @@ def create_node_groupings(
             "source_group", hash_group_column(source_col, num_groups)
         ).withColumn("target_group", hash_group_column(target_col, num_groups))
 
-        final_sdf = final_sdf.withColumn(
-            "group",
-            concat(
-                least("source_group", "target_group"),
-                lit(" -- "),
-                greatest("source_group", "target_group"),
-            ),
-        )
-
-        return final_sdf
+        return _create_group_column(final_sdf)
 
     # stack source and target
     # group by and count
@@ -97,16 +89,33 @@ def create_node_groupings(
         .drop("value")
     )
 
-    final_sdf = final_sdf.withColumn(
+    return _create_group_column(final_sdf)
+
+
+def _create_group_column(spark_dataframe: DataFrame) -> DataFrame:
+    """
+    Add the undirected `group` column `"{min} -- {max}"` from `source_group` and `target_group`.
+
+    `least` and `greatest` skip `null` arguments, so without an explicit check a row with a
+    `null` node id on one side would land in a real self-loop group such as `"3 -- 3"` and be
+    written to Neo4j. A relationship row with a `null` endpoint cannot be loaded, so the row is
+    given a `null` group (and therefore a `null` batch) instead, matching the bipartite scenario
+    and `hash_group_column`. `ingest_spark_dataframe` reports these rows via `on_null_batch`.
+    """
+
+    return spark_dataframe.withColumn(
         "group",
-        concat(
-            least("source_group", "target_group"),
-            lit(" -- "),
-            greatest("source_group", "target_group"),
+        when(
+            col("source_group").isNull() | col("target_group").isNull(),
+            lit(None),
+        ).otherwise(
+            concat(
+                least("source_group", "target_group"),
+                lit(" -- "),
+                greatest("source_group", "target_group"),
+            )
         ),
     )
-
-    return final_sdf
 
 
 def create_value_counts_dataframe(

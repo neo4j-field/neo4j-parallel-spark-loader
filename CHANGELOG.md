@@ -3,6 +3,8 @@
 ### Fixed
 
 * Bump `fonttools`, `idna`, `pillow`, `pygments`, `pytest`, `python-dotenv`, `requests`, `setuptools`, `tornado`, and `urllib3` to patched versions in `poetry.lock`, resolving 45 open Dependabot alerts. All are transitive dependencies of the `dev`/`benchmarking` Poetry groups (via `ipykernel`, `seaborn`, `requests`, `neo4j`); none are runtime dependencies of the published package.
+* `ingest_spark_dataframe` no longer silently drops rows whose `batch` is `null` (rows with a `null` node id or partition value that could not be assigned to a group). It now counts them in the same pass that collects the batch values and raises a `ValueError` before writing anything. Pass `on_null_batch="skip"` to warn and ingest the remaining rows instead.
+* Monopartite grouping now assigns a `null` `group` when either the source or target id is `null`. Previously `least`/`greatest` skipped the `null` side, so such rows landed in a real self-loop group (for example `"3 -- 3"`) and were sent to Neo4j.
 
 ### Changed
 
