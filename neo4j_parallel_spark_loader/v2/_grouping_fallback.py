@@ -44,34 +44,43 @@ def _partition_keys(spark: SparkSession, partition_count: int) -> list[int] | No
     """
     if partition_count <= 0:
         raise ValueError("partition_count must be positive")
-    initial_candidate_count = max(32, math.ceil(partition_count * (math.log(partition_count) + 16)))
+    initial_candidate_count = max(
+        32, math.ceil(partition_count * (math.log(partition_count) + 16))
+    )
     max_attempts = 8
     for attempt in range(max_attempts):
         candidate_count = initial_candidate_count * (2**attempt)
-        keys = spark.range(candidate_count).select("id", pmod(F.hash("id"), lit(partition_count)).alias("partition")).groupBy("partition").agg(F.min("id").alias("key")).collect()
+        keys = (
+            spark.range(candidate_count)
+            .select("id", pmod(F.hash("id"), lit(partition_count)).alias("partition"))
+            .groupBy("partition")
+            .agg(F.min("id").alias("key"))
+            .collect()
+        )
         if len(keys) == partition_count:
-            return [row["key"] for row in sorted(keys, key=lambda row: row["partition"])]
+            return [
+                row["key"] for row in sorted(keys, key=lambda row: row["partition"])
+            ]
     return None
 
 
-def _guarantee_group_distinct_partitions(grouped: DataFrame, schedule: list[Row], session):
+def _guarantee_group_distinct_partitions(
+    grouped: DataFrame, schedule: list[Row], session
+):
     """
-    Generate collision-free long keys where possible. Leave keys null for
-    batches whose search was exhausted, marking them for partitioning by group.
+    Group keys can still collide later
+    Generate a guaranteed collision free groupKey column to ensure this doesn't happen
     """
-    keys_by_count: dict[int, list[int] | None] = {}
-    expressions = []
+    keys_by_count = {}
+    key_rows = []
     for entry in schedule:
         count = len(entry["groups"])
         if count not in keys_by_count:
             keys_by_count[count] = _partition_keys(session, count)
-        keys = keys_by_count[count]
-        if keys is None:
-            continue
-        for group, key in zip(entry["groups"], keys):
-            expressions.extend((lit(group), lit(key).cast("long")))
-    group_keys = F.create_map(*expressions).cast("map<string,bigint>")
-    return grouped.withColumn("groupKey", group_keys[col("group")])
+        for group, key in zip(entry["groups"], keys_by_count[count]):
+            key_rows.append((group, key))
+    group_keys = session.createDataFrame(key_rows, "group string, groupKey long")
+    return grouped.drop("groupKey").join(group_keys, on="group", how="left")
 
 
 def _create_node_groupings_v2(
@@ -234,9 +243,17 @@ def _create_node_groupings_v2(
 
     # Keys depend on the number of groups actually present in each batch.
     # Collect only the schedule, never the relationship rows.
-    schedule = grouped.select("batch", "group").distinct().groupBy("batch").agg(sort_array(collect_list("group")).alias("groups")).collect()
+    schedule = (
+        grouped.select("batch", "group")
+        .distinct()
+        .groupBy("batch")
+        .agg(sort_array(collect_list("group")).alias("groups"))
+        .collect()
+    )
 
-    return _guarantee_group_distinct_partitions(grouped=grouped, schedule=schedule, session=df.sparkSession)
+    return _guarantee_group_distinct_partitions(
+        grouped=grouped, schedule=schedule, session=df.sparkSession
+    )
 
 
 def _apply_repartitioning(
@@ -276,7 +293,9 @@ def _apply_repartitioning(
       '42--60', '43--59', '44--58', '45--57', '46--56', '47--55', '48--54', '49--53', '5--97', '50--52', '51--51', '6--96', '7--95',
       '8--94', '9--93']), 
     """
-    logging.info("Finished generating the schedule for the dataset. Set logging to DEBUG to log the schedule.")
+    logging.info(
+        "Finished generating the schedule for the dataset. Set logging to DEBUG to log the schedule."
+    )
     logging.debug(schedule)
 
     logging.info(f"Applying per-batch repartitioning, using strategy {cache!s}")
@@ -296,7 +315,9 @@ def _apply_repartitioning(
         )
         batches.append(partition)
         completed += 1
-        logging.info(f"Finished repartitioning {completed}/{total_batches}, with {len(entry['groups'])} groups")
+        logging.info(
+            f"Finished repartitioning {completed}/{total_batches}, with {len(entry['groups'])} groups"
+        )
 
     logging.info("Finished applying per-batch repartitioning.")
 

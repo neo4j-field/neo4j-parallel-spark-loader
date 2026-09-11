@@ -73,7 +73,12 @@ def ingest_spark_dataframe(
     for batch in batches:
         try:
             logging.info(f"Started shipping batch {completed}/{total_batches}")
-            (batch.write.mode(save_mode).format("org.neo4j.spark.DataSource").options(**write_options).save())
+            (
+                batch.write.mode(save_mode)
+                .format("org.neo4j.spark.DataSource")
+                .options(**write_options)
+                .save()
+            )
             logging.info(f"Finished shipping batch {completed}/{total_batches}")
             completed += 1
         finally:

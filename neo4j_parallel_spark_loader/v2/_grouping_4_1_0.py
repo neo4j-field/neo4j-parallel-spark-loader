@@ -10,7 +10,17 @@ import logging
 from pyspark import StorageLevel
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.functions import col, collect_list, concat, greatest, least, lit, pmod, sort_array, xxhash64
+from pyspark.sql.functions import (
+    col,
+    collect_list,
+    concat,
+    greatest,
+    least,
+    lit,
+    pmod,
+    sort_array,
+    xxhash64,
+)
 from pyspark.sql.types import Row
 
 logging.basicConfig(
@@ -221,20 +231,30 @@ def _create_node_groupings_v2(
     batch_color = pmod(low_group + high_group, lit(color_count))
 
     # Preserve the transaction-size hint for shipping.py to pass to Neo4j.
-    grouped = df.withColumn("group", concat(low_group.cast("string"), lit("--"), high_group.cast("string"))).withColumn("batch", batch_color.cast("string")).withMetadata("batch", {"neo4j_batch_size": batch_size})
+    grouped = (
+        df.withColumn(
+            "group",
+            concat(low_group.cast("string"), lit("--"), high_group.cast("string")),
+        )
+        .withColumn("batch", batch_color.cast("string"))
+        .withMetadata("batch", {"neo4j_batch_size": batch_size})
+    )
 
     # Only observed groups need partitions; collect their identifiers, not rows.
-    schedule = grouped.select("batch", "group").distinct().groupBy("batch").agg(sort_array(collect_list("group")).alias("groups")).collect()
-
-    expressions = []
-    for entry in schedule:
-        # IDs restart at zero in every batch. Sorting makes assignment stable.
-        for key, group in enumerate(entry["groups"]):
-            expressions.extend((lit(group), lit(key).cast("int")))
+    schedule = (
+        grouped.select("batch", "group")
+        .distinct()
+        .groupBy("batch")
+        .agg(sort_array(collect_list("group")).alias("groups"))
+        .collect()
+    )
 
     # Each group belongs to exactly one batch, so group alone is a valid key.
-    group_keys = F.create_map(*expressions).cast("map<string,int>")
-    return grouped.withColumn("groupKey", group_keys[col("group")])
+    key_rows = [
+        (group, key) for entry in schedule for key, group in enumerate(entry["groups"])
+    ]
+    group_keys = df.sparkSession.createDataFrame(key_rows, "group string, groupKey int")
+    return grouped.drop("groupKey").join(group_keys, on="group", how="left")
 
 
 def _apply_repartitioning(
@@ -248,7 +268,14 @@ def _apply_repartitioning(
     logging.info("Finished repartitioning the full dataset on the `batch` key.")
 
     logging.info("Generating the schedule for the dataset.")
-    schedule: list[Row] = scheduled_df.select("batch", "group").distinct().groupBy("batch").agg(sort_array(collect_list("group")).alias("groups")).orderBy("batch").collect()
+    schedule: list[Row] = (
+        scheduled_df.select("batch", "group")
+        .distinct()
+        .groupBy("batch")
+        .agg(sort_array(collect_list("group")).alias("groups"))
+        .orderBy("batch")
+        .collect()
+    )
     """
     Example Schedule
     ----------
@@ -264,7 +291,9 @@ def _apply_repartitioning(
       '42--60', '43--59', '44--58', '45--57', '46--56', '47--55', '48--54', '49--53', '5--97', '50--52', '51--51', '6--96', '7--95',
       '8--94', '9--93']), 
     """
-    logging.info("Finished generating the schedule for the dataset. Set logging to DEBUG to log the schedule.")
+    logging.info(
+        "Finished generating the schedule for the dataset. Set logging to DEBUG to log the schedule."
+    )
     logging.debug(schedule)
 
     logging.info(f"Applying per-batch repartitioning, using strategy {cache!s}")
@@ -284,7 +313,9 @@ def _apply_repartitioning(
         )
         batches.append(partition)
         completed += 1
-        logging.info(f"Finished repartitioning {completed}/{total_batches}, with {len(entry['groups'])} groups")
+        logging.info(
+            f"Finished repartitioning {completed}/{total_batches}, with {len(entry['groups'])} groups"
+        )
 
     logging.info("Finished applying per-batch repartitioning.")
 
