@@ -6,6 +6,7 @@ from pyspark.sql.functions import col, countDistinct
 
 from neo4j_parallel_spark_loader.monopartite import group_and_batch_spark_dataframe
 from neo4j_parallel_spark_loader.monopartite.grouping import create_node_groupings
+from neo4j_parallel_spark_loader.utils.hash_grouping import hash_group_column
 
 
 @pytest.fixture(scope="module")
@@ -151,3 +152,41 @@ def test_null_node_id_yields_null_group_and_batch(
         has_null_id = row["source_node"] is None or row["target_node"] is None
         assert (row["group"] is None) == has_null_id
         assert (row["batch"] is None) == has_null_id
+
+
+def test_hash_strategy_rejects_mismatched_id_types(spark_fixture: SparkSession) -> None:
+    """
+    `hash(1 as int)` != `hash(1 as bigint)`, so mismatched column types would put the same
+    node id in different groups and break the deadlock-free invariant.
+    """
+    sdf = spark_fixture.createDataFrame(
+        [(1, 6), (6, 1)], "source_node int, target_node bigint"
+    )
+
+    with pytest.raises(TypeError, match="must have the same data type"):
+        create_node_groupings(sdf, "source_node", "target_node", 4, strategy="hash")
+
+    # casting to a common type resolves it
+    fixed = sdf.withColumn("source_node", col("source_node").cast("bigint"))
+    result = create_node_groupings(
+        fixed, "source_node", "target_node", 4, strategy="hash"
+    ).collect()
+    groups = {}
+    for row in result:
+        groups.setdefault(row["source_node"], set()).add(row["source_group"])
+        groups.setdefault(row["target_node"], set()).add(row["target_group"])
+    assert all(len(g) == 1 for g in groups.values())
+
+
+def test_hash_strategy_mismatched_types_would_split_a_node(
+    spark_fixture: SparkSession,
+) -> None:
+    """Document the failure the type guard prevents: the same id, two types, two groups."""
+    sdf = spark_fixture.createDataFrame(
+        [(i, i) for i in range(1, 200)], "as_int int, as_long bigint"
+    )
+    mismatched = sdf.select(
+        hash_group_column("as_int", 8).alias("g_int"),
+        hash_group_column("as_long", 8).alias("g_long"),
+    )
+    assert mismatched.filter(col("g_int") != col("g_long")).count() > 0
