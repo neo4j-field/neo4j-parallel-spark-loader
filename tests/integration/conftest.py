@@ -8,8 +8,8 @@ from neo4j.exceptions import DatabaseError
 
 @pytest.fixture(scope="session")
 def neo4j_driver() -> Generator[Any, Any, Any]:
-    uri = "neo4j://localhost:7687"
-    auth = ("neo4j", "password")
+    uri = "neo4j://localhost:7680"
+    auth = ("neo4j", "neo4j")
     driver = GraphDatabase.driver(uri, auth=auth)
     yield driver
     driver.close()
@@ -30,9 +30,7 @@ def healthcheck(neo4j_driver: Driver):
             success = True
         except Exception:
             attempts += 1
-            print(
-                f"failed connection {attempts} | waiting {(1 + attempts) * 2} seconds..."
-            )
+            print(f"failed connection {attempts} | waiting {(1 + attempts) * 2} seconds...")
             time.sleep((1 + attempts) * 2)
     if not success:
         raise DatabaseError()
