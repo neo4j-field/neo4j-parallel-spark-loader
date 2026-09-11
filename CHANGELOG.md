@@ -7,6 +7,7 @@
 
 ### Changed
 
+* Monopartite `create_node_groupings` with `strategy="hash"` raises a `TypeError` when the source and target id columns have different data types. Spark's `hash()` depends on the type, so the same id would otherwise land in different groups and break the deadlock-free guarantee.
 * Bipartite and monopartite `create_ingest_batches_from_groups` functions accept an optional `known_group_count` parameter to skip a `distinct().count()` pass when the number of groups is already known (used by the "hash" grouping strategy).
 
 ### Added
