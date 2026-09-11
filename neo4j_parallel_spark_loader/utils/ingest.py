@@ -1,7 +1,8 @@
+import warnings
 from typing import Any, Dict, Literal, Optional
 
 from pyspark.sql import DataFrame
-from pyspark.sql.functions import col, collect_set
+from pyspark.sql.functions import col, collect_set, count, when
 
 
 def ingest_spark_dataframe(
@@ -9,6 +10,7 @@ def ingest_spark_dataframe(
     save_mode: Literal["Overwrite", "Append"],
     options: Dict[str, Any],
     num_groups: Optional[int] = None,
+    on_null_batch: Literal["raise", "skip"] = "raise",
 ) -> None:
     """
     Saves a Spark DataFrame in multiple batches based on the 'batch' column values.
@@ -30,6 +32,14 @@ def ingest_spark_dataframe(
         The number of partitions to split Spark DataFrame into.
         If not provided, then will be calculated.
         It is more efficient to pass this parameter explicitly. By default None
+    on_null_batch : Literal["raise", "skip"], optional
+        What to do when some rows have a `null` value in the `batch` column. A `null` batch
+        means the row could not be assigned to a group, which happens when a node id column
+        (or the partition column for predefined components) is `null`. Such rows cannot be
+        written as relationships and are never part of any batch.
+        "raise" (the default) raises a `ValueError` reporting the number of affected rows
+        before anything is written to Neo4j. "skip" emits a warning with the count and
+        ingests the remaining rows. By default "raise"
 
     Example
     -------
@@ -51,6 +61,7 @@ def ingest_spark_dataframe(
     - The input DataFrame must contain 'batch' and 'grouping' columns
     - Each unique value in the 'batch' column will create a separate save operation
     - Uses the Neo4j Spark Connector for writing data to Neo4j
+    - Rows with a `null` `batch` are handled according to `on_null_batch`
     """
 
     assert save_mode in {
@@ -63,8 +74,30 @@ def ingest_spark_dataframe(
     assert (
         "group" in spark_dataframe.columns
     ), "Spark DataFrame must contain column `group`"
+    assert on_null_batch in {
+        "raise",
+        "skip",
+    }, "`on_null_batch` must be either 'raise' or 'skip'"
 
-    batch_list = spark_dataframe.select(collect_set("batch")).first()[0]
+    # Collect the distinct batch values and count null-batch rows in a single pass.
+    # `collect_set` silently discards nulls, so without the explicit count any row whose
+    # batch is null would never be written and nobody would be told.
+    batch_list, null_batch_count = spark_dataframe.select(
+        collect_set("batch"),
+        count(when(col("batch").isNull(), 1)),
+    ).first()
+
+    if null_batch_count > 0:
+        message = (
+            f"{null_batch_count} row(s) have a null `batch` and cannot be ingested. "
+            "This happens when a node id column (or the partition column for predefined "
+            "components) is null, so the row was never assigned to a group. Filter or "
+            "repair these rows before grouping, or pass `on_null_batch='skip'` to ingest "
+            "the remaining rows and drop these."
+        )
+        if on_null_batch == "raise":
+            raise ValueError(message)
+        warnings.warn(message)
 
     batches = [
         spark_dataframe.filter(col("batch") == batch_value)

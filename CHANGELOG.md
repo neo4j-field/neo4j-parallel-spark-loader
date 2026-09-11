@@ -2,6 +2,9 @@
 
 ### Fixed
 
+* `ingest_spark_dataframe` no longer silently drops rows whose `batch` is `null` (rows with a `null` node id or partition value that could not be assigned to a group). It now counts them in the same pass that collects the batch values and raises a `ValueError` before writing anything. Pass `on_null_batch="skip"` to warn and ingest the remaining rows instead.
+* Monopartite grouping now assigns a `null` `group` when either the source or target id is `null`. Previously `least`/`greatest` skipped the `null` side, so such rows landed in a real self-loop group (for example `"3 -- 3"`) and were sent to Neo4j.
+
 ### Changed
 
 * Bipartite and monopartite `create_ingest_batches_from_groups` functions accept an optional `known_group_count` parameter to skip a `distinct().count()` pass when the number of groups is already known (used by the "hash" grouping strategy).
