@@ -106,6 +106,8 @@ def group_and_batch_spark_dataframe(
         Column containing each relationship's target identifier.
     num_groups : int
         Number of endpoint hash buckets.
+        Accepts an arbitrary number of groups.
+        Adjusting the group size based on data cardinality is recommended.
     batch_size : int
         Neo4j transaction size saved in the batch column metadata.
     cache: { See ```pyspark.sql.DataFrame.persist``` and ```pyspark.StorageLevel```}
