@@ -117,9 +117,9 @@ def group_and_batch_spark_dataframe(
 
     Returns
     -------
-    DataFrame
-        The input DataFrame with collision-safe group and batch columns, repartitioned per batch,
-        and per batch-group.
+    list[DataFrame]
+        A list of collision-safe DataFrame batches, calculated from the input DataFrame.
+        Each DataFrame is repartitioned from the source, and each each group is repartitioned within per batch-group.
     """
     if num_groups <= 0:
         raise ValueError("num_groups must be positive")

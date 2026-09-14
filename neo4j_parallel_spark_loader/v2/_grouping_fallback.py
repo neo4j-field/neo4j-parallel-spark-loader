@@ -97,114 +97,167 @@ def _create_node_groupings_v2(
 ) -> DataFrame:
     """Add a collision-safe execution schedule to a relationship DataFrame.
 
-    Adds group, batch, and a long groupKey. Keys are chosen for the observed
-    group count in each batch; repartition using that count and groupKey.
-    Filtering out whole groups requires regenerating keys before changing
-    the partition count. Only schedule identifiers are collected from df.
-    If key search is exhausted, groupKey is null for that batch and
-    _apply_repartitioning uses the group column instead.
+    Supports both monopartite graphs (endpoints in the same node set) and
+    bipartite graphs (endpoints in separate node sets). The same schedule can
+    also be used to create endpoint nodes before writing relationships.
 
-    This approach works for Nodes, and both Monopartite and Bipartite Datasets.
+    Endpoint identifiers are hashed into ``num_groups`` buckets. Each row's
+    unordered pair of buckets becomes its ``group`` string, so reversing an
+    edge does not change its group. Multiple rows can share a group.
+
+    Groups are assigned to batches by adding their endpoint bucket numbers
+    modulo an odd colour count. Distinct groups in a batch cannot share an
+    endpoint bucket: given one endpoint and the batch, the other endpoint is
+    uniquely determined modulo the colour count. Consequently, groups within
+    one batch may be written concurrently; different batches must be written
+    serially. This guarantee concerns locks on these endpoint nodes, not any
+    additional shared entities that a custom write query might touch.
+
+    Within each batch, the observed group strings are sorted and assigned
+    consecutive integer ``groupKey`` values starting at zero. These are direct
+    partition IDs, not hash keys. Use Spark 4.1+ ``repartitionById`` with the
+    number of observed groups in that batch and the ``groupKey`` column.
+    Ordinary ``repartition`` hashes the keys and can put distinct groups in
+    the same partition. If groups are removed and the partition count changes,
+    regenerate the keys for the remaining groups.
 
     Parameters
     ----------
     df : DataFrame
-        Relationship rows to schedule.
+        Input rows containing the source and target identifier columns.
     source_col : str
         Column containing each relationship's source identifier.
     target_col : str
         Column containing each relationship's target identifier.
     num_groups : int
-        Number of endpoint hash buckets.
+        Positive number of endpoint hash buckets. This is not the number of
+        observed groups or the number of partitions in each batch.
     batch_size : int
-        Neo4j transaction size saved in the batch column metadata.
+        Positive Neo4j transaction size stored in the batch column metadata;
+        it does not control the number of rows in a scheduled batch.
 
     Returns
     -------
     DataFrame
-        The input DataFrame with collision-safe group and batch columns.
+        Original columns plus ``group`` (string), ``batch`` (string), and
+        ``groupKey`` (integer). The batch column carries ``neo4j_batch_size``
+        metadata. Existing columns with these names are replaced.
+
+    Notes
+    -----
+    Collects the distinct batch/group schedule on the driver to assign keys.
+    Relationship rows remain distributed. This function does not repartition
+    the returned rows; ``_apply_repartitioning`` performs that step.
 
     Examples
     --------
-    Given:
+    Given input rows such as:
 
-    >>> DataFrame(
+    >>> df = spark.createDataFrame(
     ...     [
-    ...         { "name": "John", "surname": "Doe", "age": 42, "sourceId": 1, "targetId": 99, "time": "2026-09-08T12:31:00",},
-    ...         { "name": "Jane", "surname": "Doe", "age": 40, "sourceId": 2, "targetId": 98, "time": "2026-09-08T12:31:00",},
-    ...         {"name": "Jospeh", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 3, "time": "2026-09-08T12:31:00"},
-    ...         { "name": "Mary", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 4, "time": "2026-09-08T12:31:00",},
+    ...         {"name": "John", "surname": "Doe", "age": 42, "sourceId": 1, "targetId": 99, "time": "2026-09-08T12:31:00"},
+    ...         {"name": "Jane", "surname": "Doe", "age": 40, "sourceId": 2, "targetId": 98, "time": "2026-09-08T12:31:00"},
+    ...         {"name": "Joseph", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 3, "time": "2026-09-08T12:31:00"},
+    ...         {"name": "Mary", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 4, "time": "2026-09-08T12:31:00"},
     ...     ]
     ... )
 
-    With num_groups = 100
+    With num_groups=100, the following walkthrough uses illustrative hash
+    bucket values to show each intermediate step. These are the original
+    example's assumed buckets, not asserted xxhash64 results for the IDs above.
 
-    Produce:
-    >>> DataFrame(
-    ...     [
-    ...         { "name": "John", "surname": "Doe", "age": 42, "sourceId": 1, "targetId": 99, "time": "2026-09-08T12:31:00", group: "18--19", "batch": 37},
-    ...         { "name": "Jane", "surname": "Doe", "age": 40, "sourceId": 2, "targetId": 98, "time": "2026-09-08T12:31:00", group: "25--89", "batch": 13},
-    ...         { "name": "Joseph", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 3, "time": "2026-09-08T12:31:00", group: "7--25",  "batch": 32},
-    ...         { "name": "Mary", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 4, "time": "2026-09-08T12:31:00", group: "25--27", "batch": 52},
-    ...     ]
-    ... )
+    1. Hash the source and target identifiers into endpoint buckets:
 
-    >>>
-    ...+-----------------------------+
-    ...|pmod(xxhash64(sourceId), 100)|
-    ...+-----------------------------+
-    ...|                           18|
-    ...|                           89|
-    ...|                           25|
-    ...|                           25|
-    ...+-----------------------------+
-    ...
-    ...
-    ...+-----------------------------+
-    ...|pmod(xxhash64(targetId), 100)|
-    ...+-----------------------------+
-    ...|                           19|
-    ...|                           25|
-    ...|                            7|
-    ...|                           27|
-    ...+-----------------------------+
-    ...
-    ...+-------------------------------------------------------------------+
-    ...|least(pmod(xxhash64(sourceId), 100), pmod(xxhash64(targetId), 100))|
-    ...+-------------------------------------------------------------------+
-    ...|                                                                 18|
-    ...|                                                                 25|
-    ...|                                                                  7|
-    ...|                                                                 25|
-    ...+-------------------------------------------------------------------+
-    ...
-    ...+----------------------------------------------------------------------+
-    ...|greatest(pmod(xxhash64(sourceId), 100), pmod(xxhash64(targetId), 100))|
-    ...+----------------------------------------------------------------------+
-    ...|                                                                    19|
-    ...|                                                                    89|
-    ...|                                                                    25|
-    ...|                                                                    27|
-    ...+----------------------------------------------------------------------+
-    ...
-    ...+------+
-    ...| group|
-    ...+------+
-    ...|18--19|
-    ...|25--89|
-    ...| 7--25|
-    ...|25--27|
-    ...+------+
-    ...
-    ...+-----+
-    ...|batch|
-    ...+-----+
-    ...|   37|
-    ...|   13|
-    ...|   32|
-    ...|   52|
-    ...+-----+
+    +-----------------------------+
+    |pmod(xxhash64(sourceId), 100)|
+    +-----------------------------+
+    |                           18|
+    |                           89|
+    |                           25|
+    |                           25|
+    +-----------------------------+
 
+    +-----------------------------+
+    |pmod(xxhash64(targetId), 100)|
+    +-----------------------------+
+    |                           19|
+    |                           25|
+    |                            7|
+    |                           27|
+    +-----------------------------+
+
+    2. Find the lower and higher bucket for each row. This ensures reverse
+    edges receive the same group:
+
+    +-------------------------------------------------------------------+
+    |least(pmod(xxhash64(sourceId), 100), pmod(xxhash64(targetId), 100))|
+    +-------------------------------------------------------------------+
+    |                                                                 18|
+    |                                                                 25|
+    |                                                                  7|
+    |                                                                 25|
+    +-------------------------------------------------------------------+
+
+    +----------------------------------------------------------------------+
+    |greatest(pmod(xxhash64(sourceId), 100), pmod(xxhash64(targetId), 100))|
+    +----------------------------------------------------------------------+
+    |                                                                    19|
+    |                                                                    89|
+    |                                                                    25|
+    |                                                                    27|
+    +----------------------------------------------------------------------+
+
+    3. Join the lower and higher bucket numbers with "--":
+
+    +------+
+    | group|
+    +------+
+    |18--19|
+    |25--89|
+    | 7--25|
+    |25--27|
+    +------+
+
+    4. Assign the batch with pmod(low_group + high_group, 101). For 100
+    endpoint buckets, the colour count is 101, not 100:
+
+    +-----+
+    |batch|
+    +-----+
+    |   37|
+    |   13|
+    |   32|
+    |   52|
+    +-----+
+
+    For example, (18 + 19) % 101 = 37 and (25 + 89) % 101 = 13.
+    The resulting rows retain their original properties:
+
+    [
+        {"name": "John", "surname": "Doe", "age": 42, "sourceId": 1, "targetId": 99, "time": "2026-09-08T12:31:00", "group": "18--19", "batch": "37", "groupKey": 0},
+        {"name": "Jane", "surname": "Doe", "age": 40, "sourceId": 2, "targetId": 98, "time": "2026-09-08T12:31:00", "group": "25--89", "batch": "13", "groupKey": 0},
+        {"name": "Joseph", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 3, "time": "2026-09-08T12:31:00", "group": "7--25", "batch": "32", "groupKey": 0},
+        {"name": "Mary", "surname": "Doe", "age": 40, "sourceId": 98, "targetId": 4, "time": "2026-09-08T12:31:00", "group": "25--27", "batch": "52", "groupKey": 0},
+    ]
+
+    Each batch here contains only one observed group, so every groupKey is 0.
+    The shared endpoint bucket 25 occurs in separate batches (13, 32, 52),
+    which are written serially to prevent concurrent access to that bucket.
+
+    5. To illustrate multiple groups in one batch and their groupKey values,
+    Suppose num_groups=5 and the endpoint hashes produce these bucket pairs
+    (the values below are buckets, not original node identifiers):
+
+    source bucket  target bucket  group  batch  groupKey
+    0              3              0--3   3      0
+    1              2              1--2   3      1
+    2              1              1--2   3      1
+    4              4              4--4   3      2
+
+    Batch 3 has three distinct groups with disjoint endpoint bucket sets.
+    Repartitioning it with ``repartitionById(3, "groupKey")`` puts each group
+    in its own partition. Reverse edges share a group and partition; the
+    self-loop bucket group 4--4 is also isolated from the other groups.
     """
 
     # Calculate the hash of each unique value in the column, and create a new column with those values
