@@ -63,7 +63,21 @@ ingest_spark_dataframe(batched_purchase_df, "Overwrite", {"query": includes_prod
 
 Grouping and batching scenarios of various levels of complexity can be appropriate depending on the structure of the relationship data being loaded to Neo4j. The Neo4j Parallel Spark Loader library supports three scenarios: predefined components, bipartite data, and monopartite data.
 
-Each grouping and batching scenario has its own module. The `group_and_batch_spark_dataframe` function in each module accepts a Spark DataFrame with parameters specific to the scenario. It appends `batch` and `final_grouping` columns to the DataFrame. The `ingest_spark_dataframe()` function splits the original DataFrame into separate DataFrames based on the value of the `batch` column. Each batch's dataframe is repartitioned on the `final_grouping` column and then written to Neo4j with Spark workers processing groups in parallel.
+Each grouping and batching scenario has its own module. The `group_and_batch_spark_dataframe` function in each module accepts a Spark DataFrame with parameters specific to the scenario. It appends `batch` and `final_grouping` columns to the DataFrame. The `ingest_spark_dataframe()` function splits the original DataFrame into separate DataFrames based on the value of the `batch` column. Each batch's dataframe is repartitioned so that every group occupies exactly one Spark partition and then written to Neo4j with Spark workers processing groups in parallel.
+
+### Ingesting very large DataFrames
+
+Each batch is a filter over the grouped DataFrame, and Spark recomputes the input plan for every batch. For large inputs pass `checkpoint_path` to `ingest_spark_dataframe()`. The grouped DataFrame is then written once as Parquet partitioned by `batch`, and each batch reads only its own files:
+
+```
+ingest_spark_dataframe(
+    batched_df, "Overwrite", options, checkpoint_path="s3://bucket/tmp/relationship-load/"
+)
+```
+
+If the job fails partway through, the checkpoint is still there. Read it back, filter to the batches that did not finish, and pass the result to `ingest_spark_dataframe()` again without a `checkpoint_path`. Delete the checkpoint once the load is complete.
+
+Progress is logged per batch at INFO level through the `neo4j_parallel_spark_loader.utils.ingest` logger.
 
 ### Predefined components scenario
 
