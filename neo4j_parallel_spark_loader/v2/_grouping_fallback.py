@@ -77,7 +77,12 @@ def _guarantee_group_distinct_partitions(
         count = len(entry["groups"])
         if count not in keys_by_count:
             keys_by_count[count] = _partition_keys(session, count)
-        for group, key in zip(entry["groups"], keys_by_count[count]):
+        keys = keys_by_count[count]
+        if keys is None:
+            # The left join leaves these keys null, selecting group-based
+            # repartitioning for batches whose bounded search was exhausted.
+            continue
+        for group, key in zip(entry["groups"], keys):
             key_rows.append((group, key))
     group_keys = session.createDataFrame(key_rows, "group string, groupKey long")
     return grouped.drop("groupKey").join(group_keys, on="group", how="left")

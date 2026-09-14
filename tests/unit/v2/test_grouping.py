@@ -162,7 +162,10 @@ def test_empty_input_has_schedule_schema_and_no_batches(v2_spark, backend):
     df = v2_spark.createDataFrame([], "source long, target long")
     grouped = backend._create_node_groupings_v2(df, "source", "target", 4, 100)
     assert grouped.collect() == []
-    assert grouped.columns == ["source", "target", "group", "batch", "groupKey"]
+    # Joining the schedule by group may move that column to the front.
+    assert Counter(grouped.columns) == Counter(
+        ["source", "target", "group", "batch", "groupKey"]
+    )
     assert grouped.schema["batch"].metadata["neo4j_batch_size"] == 100
     assert backend._apply_repartitioning(grouped, StorageLevel.NONE) == []
 
