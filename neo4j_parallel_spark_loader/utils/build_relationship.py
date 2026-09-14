@@ -23,6 +23,8 @@ def build_relationship(
     num_groups: Optional[int] = 10,
     max_serial: Optional[int] = 1000000,
     strategy: Literal["greedy", "hash"] = "greedy",
+    on_null_batch: Literal["raise", "skip"] = "raise",
+    checkpoint_path: Optional[str] = None,
 ) -> None:
     """Build a relationship between two nodes.
     Params:
@@ -41,6 +43,14 @@ def build_relationship(
             distinct id counts to the driver and does not scale to very large datasets.
             "hash" computes group assignments entirely in Spark and scales to very large
             datasets, at the cost of not balancing group sizes. By default "greedy"
+        on_null_batch: Literal["raise", "skip"], optional
+            Passed to `ingest_spark_dataframe`. "raise" stops before writing if any rows
+            have a null node id; "skip" warns and ingests the rest. By default "raise"
+        checkpoint_path: Optional[str], optional
+            Passed to `ingest_spark_dataframe`. When set, the grouped DataFrame is written
+            once as Parquet partitioned by batch and each batch is read back from there
+            instead of recomputing the input. Recommended for very large DataFrames.
+            By default None
     """
     options = {
         "relationship": relationship_name,
@@ -55,8 +65,9 @@ def build_relationship(
     if rel_props:
         options["relationship.properties"] = ",".join(rel_props)
 
-    print(f"""Building {df.count()} relationships""")
-    if group_keys and len(group_keys) > 0 and df.count() > max_serial:
+    row_count = df.count()
+    print(f"""Building {row_count} relationships""")
+    if group_keys and len(group_keys) > 0 and row_count > max_serial:
         print("Building in parallel")
         if len(group_keys) == 1:
             print("Using Predefined Grouping")
@@ -73,7 +84,8 @@ def build_relationship(
             spark_dataframe=batched_df,
             save_mode="Overwrite",
             options=options,
-            num_groups=num_groups,
+            on_null_batch=on_null_batch,
+            checkpoint_path=checkpoint_path,
         )
     else:
         print("Building in series")
