@@ -63,7 +63,23 @@ ingest_spark_dataframe(batched_purchase_df, "Overwrite", {"query": includes_prod
 
 Grouping and batching scenarios of various levels of complexity can be appropriate depending on the structure of the relationship data being loaded to Neo4j. The Neo4j Parallel Spark Loader library supports three scenarios: predefined components, bipartite data, and monopartite data.
 
-Each grouping and batching scenario has its own module. The `group_and_batch_spark_dataframe` function in each module accepts a Spark DataFrame with parameters specific to the scenario. It appends `batch` and `final_grouping` columns to the DataFrame. The `ingest_spark_dataframe()` function splits the original DataFrame into separate DataFrames based on the value of the `batch` column. Each batch's dataframe is repartitioned on the `final_grouping` column and then written to Neo4j with Spark workers processing groups in parallel.
+Each grouping and batching scenario has its own module. The `group_and_batch_spark_dataframe` function in each module accepts a Spark DataFrame with parameters specific to the scenario. It appends `batch` and `final_grouping` columns to the DataFrame. The `ingest_spark_dataframe()` function splits the original DataFrame into separate DataFrames based on the value of the `batch` column. Each batch's dataframe is repartitioned so that every group occupies exactly one Spark partition and then written to Neo4j with Spark workers processing groups in parallel.
+
+### Ingesting very large DataFrames
+
+Each batch is a filter over the grouped DataFrame, and Spark recomputes the input plan for every batch. For large inputs pass `checkpoint_path` to `ingest_spark_dataframe()`. The grouped DataFrame is then written once as Parquet partitioned by `batch`, and each batch reads only its own files:
+
+```
+ingest_spark_dataframe(
+    batched_df, "Overwrite", options, checkpoint_path="s3://bucket/tmp/relationship-load/"
+)
+```
+
+If the job fails partway through, the checkpoint is still there. Read it back, filter to the batches that did not finish, and pass the result to `ingest_spark_dataframe()` again without a `checkpoint_path`. Delete the checkpoint once the load is complete.
+
+For sustained loads of hundreds of millions of relationships, also pass `sort_columns=[source_col]`. Hash grouping leaves rows in random order, so each transaction touches unrelated node records and dirties a fresh page almost every row, and Neo4j's checkpoints grow until commits are waiting on disk. Sorting each group by the source id makes consecutive rows update the same node record and relationship chain, so each transaction dirties far fewer pages. The sort is local to each partition and does not change grouping or batching.
+
+Progress is logged per batch at INFO level through the `neo4j_parallel_spark_loader.utils.ingest` logger.
 
 ### Predefined components scenario
 
@@ -102,6 +118,25 @@ We can visualize the nodes within the same group as a single aggregated node and
 ![Diagram showing aggregated bipartite relationships colored by group](./docs/assets/images/monopartite-coloring-diagram.png)
 
 In the aggregated monopartite diagram, multiple relationships (each representing a group of individual relationships) connect to each node (representing a group of nodes). Because nodes could be either source or target, there are no arrow heads in the diagram representing relationship direction. However, the nodes are always stored with a direction in Neo4j. Using the rotational symmetry of the complete graph, the relationships are colored so that no relationships of the same color connect to the same node. The relationship colors represent the batches applied to the data. In the picture above, the relationship groups represented by red arrows can be processed in parallel because no node groups are connected to more than one red relationship group. After the red batch has completed, each additional color batch can be processed in turn until all relationships have been loaded. Notice that with five node groups, each color batch contains three relationship groups. This demonstrates why the number of groups should be larger than the number of parallel transactions that you want to execute.
+
+## Grouping strategies
+
+Each scenario's `create_node_groupings`/`group_and_batch_spark_dataframe` function accepts a `strategy` parameter: `"greedy"` (the default) or `"hash"`.
+
+* **`greedy`** groups node IDs so that each group represents roughly the same number of rows. To do this, it counts every distinct node ID on the driver and runs a single-threaded bin-packing pass over that list before joining the result back onto the DataFrame. This produces well-balanced groups, but the driver-side count/collect/join steps do not scale to datasets with a very large number of distinct node IDs, and can exhaust driver memory.
+* **`hash`** assigns each row's group with `hash(id) % num_groups`, computed entirely within Spark. There is no driver collect and no join, so it scales to arbitrarily large datasets. The tradeoff is that group sizes are not balanced by row count -- they are only as balanced as the hash distribution of the ID values happens to be.
+
+Use `hash` when you have a very large number of distinct node IDs and greedy grouping is too slow or is exhausting driver memory. Prefer `greedy` (the default) when the dataset is small enough for the driver to handle, or when a small number of "supernode" IDs account for a disproportionate share of the rows -- since `hash` does not balance for this, a supernode's rows can pile up in whichever groups its ID happens to hash into, creating a slow, unbalanced batch. Check your data's degree distribution (for example, the top 50 node IDs by row count) before choosing `hash` on data you suspect may have supernodes.
+
+`null` node IDs (or, for predefined components, a `null` partition value) are assigned a `null` group under both strategies. Because the group is `null`, the batch is `null` as well, and these rows cannot be loaded as relationships. `ingest_spark_dataframe()` counts them before writing and raises a `ValueError` by default; pass `on_null_batch="skip"` to emit a warning and ingest the remaining rows instead.
+
+```
+from neo4j_parallel_spark_loader.bipartite import group_and_batch_spark_dataframe
+
+batched_purchase_df = group_and_batch_spark_dataframe(
+    purchase_df, "customer_id", "store_id", 8, strategy="hash"
+)
+```
 
 ## Workflow Visualization
 

@@ -1,11 +1,17 @@
+from typing import Literal
+
 from pyspark.sql import DataFrame
 
 from ..utils.grouping import create_value_counts_dataframe, create_value_groupings
+from ..utils.hash_grouping import hash_group_column
 from ..utils.verify_spark import verify_spark_version
 
 
 def create_node_groupings(
-    spark_dataframe: DataFrame, partition_col: str, num_groups: int
+    spark_dataframe: DataFrame,
+    partition_col: str,
+    num_groups: int,
+    strategy: Literal["greedy", "hash"] = "greedy",
 ) -> DataFrame:
     """
     Create node groupings for parallel ingest into Neo4j.
@@ -19,6 +25,16 @@ def create_node_groupings(
         The desired column to partition on.
     num_groups : int
         The desired number of groups to generate. The process may generate less groups as necessary.
+    strategy : Literal["greedy", "hash"], optional
+        The grouping strategy to use. By default "greedy".
+        "greedy" collects distinct `partition_col` value counts to the driver and greedily
+        bin-packs them into balanced groups. This scales poorly with the number of distinct
+        values and can OOM the driver on very large datasets.
+        "hash" assigns each row's `group` using `hash(partition_col) % num_groups` entirely
+        within Spark, with no driver collect and no join. It scales to very large datasets
+        but does not balance group sizes, so a small number of extremely large components
+        (supernodes) can produce unbalanced groups. `null` values in `partition_col` are
+        assigned a `null` group under both strategies.
 
     Returns
     -------
@@ -27,6 +43,11 @@ def create_node_groupings(
     """
 
     verify_spark_version(spark_session=spark_dataframe.sparkSession)
+
+    if strategy == "hash":
+        return spark_dataframe.withColumn(
+            "group", hash_group_column(partition_col, num_groups)
+        )
 
     # to create buckets
     # run over partition_col
