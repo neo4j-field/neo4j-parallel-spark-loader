@@ -18,6 +18,7 @@ def ingest_spark_dataframe(
     num_groups: Optional[int] = None,
     on_null_batch: Literal["raise", "skip"] = "raise",
     checkpoint_path: Optional[str] = None,
+    sort_columns: Optional[List[str]] = None,
 ) -> None:
     """
     Saves a Spark DataFrame in multiple batches based on the 'batch' column values.
@@ -61,6 +62,15 @@ def ingest_spark_dataframe(
         data at the path is overwritten. Rows with a `null` batch are written under the
         `batch=__HIVE_DEFAULT_PARTITION__` directory where they can be inspected. The caller
         is responsible for deleting the checkpoint after the load. By default None
+    sort_columns : Optional[List[str]], optional
+        Columns to sort each group's rows by before they are written, typically the source
+        node id column. Hash grouping leaves rows in effectively random order, so consecutive
+        relationships in a transaction touch unrelated node records and relationship chains
+        and dirty a fresh page almost every row. Sorting by the source id makes consecutive
+        rows update the same node record and chain head, so each transaction dirties far
+        fewer pages, checkpoints have less to flush, and commits contend less with checkpoint
+        IO. The sort is local to each partition and does not change which rows are in which
+        group or batch, so the deadlock-free guarantee is unaffected. By default None (no sort)
 
     Example
     -------
@@ -85,6 +95,7 @@ def ingest_spark_dataframe(
     - Rows with a `null` `batch` or `group` are handled according to `on_null_batch`
     - Progress is reported through the `neo4j_parallel_spark_loader.utils.ingest` logger at
       INFO level
+    - Pass `sort_columns=[source_col]` to improve write locality on Neo4j for large loads
     """
 
     assert save_mode in {
@@ -101,6 +112,10 @@ def ingest_spark_dataframe(
         "raise",
         "skip",
     }, "`on_null_batch` must be either 'raise' or 'skip'"
+    for column in sort_columns or []:
+        assert (
+            column in spark_dataframe.columns
+        ), f"sort column `{column}` is not in the Spark DataFrame"
 
     spark: SparkSession = spark_dataframe.sparkSession
 
@@ -173,12 +188,19 @@ def ingest_spark_dataframe(
             batch_rows,
         )
 
-        (
+        batch_df = (
             spark_dataframe.filter(col("batch") == batch_value)
             .filter(col("group").isNotNull())
             .withColumn(_GROUP_KEY_COLUMN, group_to_key[col("group")])
             .repartition(partition_count, col(_GROUP_KEY_COLUMN))
-            .drop(_GROUP_KEY_COLUMN)
+        )
+        if sort_columns:
+            # sorted within each partition only; the partitioning (one group per
+            # partition) is preserved, so groups still never share a writer
+            batch_df = batch_df.sortWithinPartitions(*sort_columns)
+
+        (
+            batch_df.drop(_GROUP_KEY_COLUMN)
             .write.mode(save_mode)
             .format("org.neo4j.spark.DataSource")
             .options(**options)

@@ -234,3 +234,32 @@ def test_predefined_null_partition_value_is_reported(
 
     with pytest.raises(ValueError, match="1 row\\(s\\) have a null `batch` or `group`"):
         ingest_spark_dataframe(grouped, "Append", options={})
+
+
+def test_ingest_sorts_rows_within_each_partition(
+    spark_fixture: SparkSession, mocker: MockerFixture
+) -> None:
+    sdf = spark_fixture.range(3000).selectExpr(
+        "cast(id * 7919 % 211 as string) as src",
+        "cast(id * 104729 % 389 as string) as tgt",
+    )
+    grouped = group_and_batch_bipartite(sdf, "src", "tgt", 4, strategy="hash")
+
+    captured = _capture_neo4j_saves(mocker)
+    ingest_spark_dataframe(grouped, "Append", options={}, sort_columns=["src"])
+
+    assert captured
+    for batch_df in captured:
+        _assert_one_group_per_partition(batch_df)
+        for partition in batch_df.select("src").rdd.glom().collect():
+            values = [row["src"] for row in partition]
+            assert values == sorted(values)
+
+
+def test_ingest_rejects_unknown_sort_column(spark_fixture: SparkSession) -> None:
+    sdf = spark_fixture.createDataFrame(
+        [(1, 6, "0 --> 1", 0)],
+        "source_node int, target_node int, group string, batch int",
+    )
+    with pytest.raises(AssertionError, match="sort column `nope` is not in"):
+        ingest_spark_dataframe(sdf, "Append", options={}, sort_columns=["nope"])
