@@ -324,10 +324,12 @@ def _apply_repartitioning(
         return batches
     except Exception:
         for batch in batches:
-            batch.unpersist()  # Ensure any batch creation failure unpersists all already created batches
+            batch.unpersist(
+                blocking=False
+            )  # Ensure any batch creation failure unpersists all already created batches
         raise
     finally:
-        scheduled_df.unpersist()
+        scheduled_df.unpersist(blocking=False)
 
 
 def group_and_batch_spark_dataframe(

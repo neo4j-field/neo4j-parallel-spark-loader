@@ -74,8 +74,9 @@ def test_missing_required_column_is_rejected(missing):
     batch.write.mode.assert_not_called()
 
 
-def test_empty_batches_are_a_noop():
-    ingest_spark_dataframe([], "Append")
+def test_empty_batches_raise():
+    with pytest.raises(ValueError, match="No batches"):
+        ingest_spark_dataframe([], "Append")
 
 
 def test_failed_write_releases_current_batch_and_stops_shipping():
@@ -151,8 +152,9 @@ def test_resume_rejects_noninteger_offsets(resume_from):
 
 
 @pytest.mark.parametrize("resume_from", [None, 0])
-def test_resume_empty_input_is_a_noop(resume_from):
-    ingest_spark_dataframe([], "Append", resume_from=resume_from)
+def test_resume_empty_input_is_rejected(resume_from):
+    with pytest.raises(ValueError, match="No batches"):
+        ingest_spark_dataframe([], "Append", resume_from=resume_from)
 
 
 def test_resume_nonzero_offset_on_empty_input_is_rejected():
