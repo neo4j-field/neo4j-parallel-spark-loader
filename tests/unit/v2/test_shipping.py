@@ -4,12 +4,20 @@ import pytest
 from pyspark.sql.types import StringType, StructField, StructType
 
 from neo4j_parallel_spark_loader.v2.shipping import ingest_spark_dataframe
+from neo4j_parallel_spark_loader.v2 import shipping
 
 
 def make_batch(metadata=None, columns=("batch", "group")):
     batch = Mock()
     batch.columns = list(columns)
-    batch.schema = StructType([StructField(name, StringType(), metadata=metadata if name == "batch" else {}) for name in columns])
+    batch.schema = StructType(
+        [
+            StructField(
+                name, StringType(), metadata=metadata if name == "batch" else {}
+            )
+            for name in columns
+        ]
+    )
     batch.write.mode.return_value = batch.write
     batch.write.format.return_value = batch.write
     batch.write.options.return_value = batch.write
@@ -29,12 +37,16 @@ def make_batch(metadata=None, columns=("batch", "group")):
         ({"neo4j_batch_size": 123}, {"batch.size": "999"}, {"batch.size": "999"}),
     ],
 )
-def test_writes_batches_serially_with_connector_options(mode, metadata, options, expected):
+def test_writes_batches_serially_with_connector_options(
+    mode, metadata, options, expected
+):
     batches = [make_batch(metadata), make_batch(metadata)]
     events = []
     for index, batch in enumerate(batches):
         batch.write.save.side_effect = lambda i=index: events.append(("save", i))
-        batch.unpersist.side_effect = lambda *, blocking, i=index: events.append(("unpersist", i))
+        batch.unpersist.side_effect = lambda *, blocking, i=index: events.append(
+            ("unpersist", i)
+        )
     original = dict(options)
 
     ingest_spark_dataframe(batches, mode, options)
@@ -61,7 +73,9 @@ def test_default_options_do_not_leak_between_calls():
 @pytest.mark.parametrize("mode", ["append", "overwrite", "Ignore", "", None])
 def test_invalid_save_mode_is_rejected_before_writing(mode):
     batch = make_batch()
-    with pytest.raises(ValueError, match="save_mode must be either 'Append' or 'Overwrite'"):
+    with pytest.raises(
+        ValueError, match="save_mode must be either 'Append' or 'Overwrite'"
+    ):
         ingest_spark_dataframe([batch], mode)
     batch.write.mode.assert_not_called()
 
@@ -69,7 +83,9 @@ def test_invalid_save_mode_is_rejected_before_writing(mode):
 @pytest.mark.parametrize("missing", ["batch", "group"])
 def test_missing_required_column_is_rejected(missing):
     batch = make_batch(columns=[name for name in ("batch", "group") if name != missing])
-    with pytest.raises(ValueError, match=f"Spark DataFrame must contain column `{missing}`"):
+    with pytest.raises(
+        ValueError, match=f"Spark DataFrame must contain column `{missing}`"
+    ):
         ingest_spark_dataframe([batch], "Append")
     batch.write.mode.assert_not_called()
 
@@ -95,8 +111,12 @@ def test_failed_write_releases_current_batch_and_stops_shipping():
 @pytest.mark.parametrize("missing", ["batch", "group"])
 def test_validates_all_batches_before_first_write(missing):
     first = make_batch()
-    invalid = make_batch(columns=[name for name in ("batch", "group") if name != missing])
-    with pytest.raises(ValueError, match=f"Spark DataFrame must contain column `{missing}`"):
+    invalid = make_batch(
+        columns=[name for name in ("batch", "group") if name != missing]
+    )
+    with pytest.raises(
+        ValueError, match=f"Spark DataFrame must contain column `{missing}`"
+    ):
         ingest_spark_dataframe([first, invalid], "Append")
     first.write.mode.assert_not_called()
     invalid.write.mode.assert_not_called()
@@ -114,7 +134,9 @@ def test_writer_setup_failure_also_releases_batch():
 @pytest.mark.parametrize(
     "resume_from,start", [(None, 0), (0, 0), (1, 0), (2, 1), (3, 2)]
 )
-def test_resume_writes_only_selected_suffix_and_releases_all_batches(resume_from, start, caplog):
+def test_resume_writes_only_selected_suffix_and_releases_all_batches(
+    resume_from, start, caplog
+):
     batches = [make_batch({"neo4j_batch_size": 100 + i}) for i in range(3)]
     original = list(batches)
     events = []
@@ -131,7 +153,9 @@ def test_resume_writes_only_selected_suffix_and_releases_all_batches(resume_from
         if index < start:
             batch.write.mode.assert_not_called()
         else:
-            batch.write.options.assert_called_once_with(**{"batch.size": str(100 + start)})
+            batch.write.options.assert_called_once_with(
+                **{"batch.size": str(100 + start)}
+            )
             assert f"Started shipping batch {index + 1}/3" in caplog.text
 
 
@@ -176,3 +200,59 @@ def test_resumed_write_failure_releases_skipped_current_and_remaining_batches():
     batches[3].write.mode.assert_not_called()
     for batch in batches:
         batch.unpersist.assert_called_once_with(blocking=False)
+
+
+@pytest.mark.parametrize("failure_at", [None, 1, 2])
+def test_unpersist_false_retains_skipped_written_and_unwritten_batches(failure_at):
+    batches = [make_batch() for _ in range(4)]
+    if failure_at is not None:
+        batches[failure_at].write.save.side_effect = RuntimeError("write failed")
+        with pytest.raises(RuntimeError, match="write failed"):
+            ingest_spark_dataframe(batches, "Append", resume_from=2, unpersist=False)
+        batches[failure_at + 1].write.save.assert_not_called()
+    else:
+        ingest_spark_dataframe(batches, "Append", resume_from=2, unpersist=False)
+        for batch in batches[1:]:
+            batch.write.save.assert_called_once_with()
+    batches[0].write.save.assert_not_called()
+    for batch in batches:
+        batch.unpersist.assert_not_called()
+
+
+def test_two_write_passes_release_batches_only_after_final_pass():
+    batches = [make_batch(), make_batch()]
+    ingest_spark_dataframe(batches, "Overwrite", {"query": "nodes"}, unpersist=False)
+    for batch in batches:
+        batch.unpersist.assert_not_called()
+    ingest_spark_dataframe(batches, "Overwrite", {"query": "relationships"})
+    for batch in batches:
+        assert batch.write.save.call_count == 2
+        batch.unpersist.assert_called_once_with(blocking=False)
+
+
+@pytest.mark.parametrize("unpersist", [None, 0, 1, "false"])
+def test_unpersist_requires_boolean(unpersist):
+    batch = make_batch()
+    with pytest.raises(TypeError, match="unpersist"):
+        ingest_spark_dataframe([batch], "Append", unpersist=unpersist)
+    batch.write.mode.assert_not_called()
+    batch.unpersist.assert_not_called()
+
+
+@pytest.mark.parametrize("write_fails", [False, True])
+def test_staging_cleanup_failure_is_reported_without_masking_write_failure(
+    monkeypatch, caplog, write_fails
+):
+    batch = make_batch()
+    cleanup = Mock(side_effect=OSError("staging deletion failed"))
+    monkeypatch.setattr(shipping, "_release_staging", cleanup)
+    if write_fails:
+        batch.write.save.side_effect = RuntimeError("write failed")
+        with pytest.raises(RuntimeError, match="write failed"):
+            ingest_spark_dataframe([batch], "Append")
+        assert "Could not clean staging" in caplog.text
+    else:
+        with pytest.raises(OSError, match="staging deletion failed"):
+            ingest_spark_dataframe([batch], "Append")
+    cleanup.assert_called_once_with([batch])
+    batch.unpersist.assert_called_once_with(blocking=False)

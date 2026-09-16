@@ -1,7 +1,10 @@
 import logging
+import sys
 from typing import Any, Dict, Literal, Optional
 
 from pyspark.sql import DataFrame
+
+from ._scheduling import _release_staging
 
 logging.basicConfig(
     force=True,
@@ -16,17 +19,15 @@ def ingest_spark_dataframe(
     save_mode: Literal["Overwrite", "Append"],
     options: Dict[str, Any] = {},
     resume_from: Optional[int] = 0,
+    unpersist: bool = True,
 ) -> None:
     """Write a scheduled Spark DataFrame to Neo4j without lock collisions.
 
     The input must contain the ``batch`` and ``group`` columns produced by
     ``v2.grouping.group_and_batch_spark_dataframe``.
 
-    Rows are shuffled and cached by batch once, preventing Spark from recomputing
-    the complete input for every write round.
-
-    Only the small set of distinct batch/group identifiers is collected
-    on the driver; relationship rows remain distributed across the cluster.
+    Grouping prepares and caches the batches before this function is called.
+    Shipping does not collect relationship rows on the driver.
 
     Batches are written serially to provide a collision barrier. Within each
     batch, groups have disjoint endpoint buckets and are written in parallel.
@@ -35,13 +36,15 @@ def ingest_spark_dataframe(
     by group instead and may include empty partitions.
 
     The grouping metadata supplies Neo4j's ``batch.size`` unless it is already
-    present in ``options``. Cached data uses memory with disk spill and is always
-    released, including when a write fails.
+    present in ``options``. Caches and loader-owned staging files are released
+    by default, including when a write fails. Set ``unpersist=False`` to retain
+    both for another write pass or retry.
 
     Parameters
     ----------
     batches : list[DataFrame]
-        Ordered batches returned by ``v2.grouping.group_and_batch_spark_dataframe``.
+        Ordered batches returned by ``group_and_batch_spark_dataframe`` or
+        restored after a restart with ``load_staged_batches``.
     save_mode : {"Overwrite", "Append"}
         Spark save mode passed to the Neo4j connector.
     options : dict
@@ -52,12 +55,25 @@ def ingest_spark_dataframe(
         logged as batch 3/N, use ``resume_from=3`` to retry that batch. The same
         ordered input batches must be supplied. ``len(batches)`` retries the
         final batch; negative numbers or numbers above that limit are rejected.
-        Skipped batches are also unpersisted. Retrying a partly completed batch
-        can repeat writes, so use an idempotent query when resuming.
+        Skipped batches are also unpersisted when ``unpersist=True``. Retrying
+        a partly completed batch can repeat writes, so use an idempotent query. Staged
+        batches can only be retried if the previous call used unpersist=False;
+        otherwise rebuild them because their staging files have been removed.
+    unpersist : bool, default True
+        Release all batch caches, including skipped and unwritten batches,
+        on completion or failure. Delete loader-owned staging directories
+        once all their original batches have been released. When False,
+        retain both caches and staging files even on failure; the caller
+        owns cleanup if the run is abandoned. Use False for a node write followed
+        by a relationship write, and True on the final pass. If the first
+        pass fails, release caches and remove staging when abandoning the run.
+        Staged DataFrames must not be reused after cleanup.
     """
 
     if save_mode not in {"Append", "Overwrite"}:
         raise ValueError("save_mode must be either 'Append' or 'Overwrite'")
+    if not isinstance(unpersist, bool):
+        raise TypeError("unpersist must be a boolean")
 
     batch_number = 0 if resume_from is None else resume_from
     if isinstance(batch_number, bool) or not isinstance(batch_number, int):
@@ -99,8 +115,19 @@ def ingest_spark_dataframe(
                 logging.info(f"Finished shipping batch {completed}/{total_batches}")
             finally:
                 cleanup_from = index + 1
-                batch.unpersist(blocking=False)
+                if unpersist:
+                    batch.unpersist(blocking=False)
     finally:
         # Release batches not reached when a write fails.
-        for batch in batches[cleanup_from:]:
-            batch.unpersist(blocking=False)
+        if unpersist:
+            failed = sys.exc_info()[0] is not None
+            try:
+                for batch in batches[cleanup_from:]:
+                    batch.unpersist(blocking=False)
+            finally:
+                try:
+                    _release_staging(batches)
+                except Exception:
+                    if not failed:
+                        raise
+                    logging.exception("Could not clean staging after a failed write")

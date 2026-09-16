@@ -18,6 +18,7 @@ def group_and_batch_spark_dataframe(
     num_groups: int,
     batch_size: int = 20000,
     cache: StorageLevel = StorageLevel.MEMORY_AND_DISK,
+    staging_path: str | None = None,
 ) -> list[DataFrame]:
     """Add a collision-safe execution schedule to a relationship DataFrame.
 
@@ -33,12 +34,21 @@ def group_and_batch_spark_dataframe(
     The returned batches contain the original columns plus group, batch, and
     groupKey. Each groupKey hashes to a distinct partition within its batch
     when using that batch's observed group count as the partition count.
-    On older Spark versions, exhausted partition-key searches fall back to
-    partitioning affected batches by group, with null groupKey values. This
-    preserves the batch schedule but may leave some partitions empty.
+    On older Spark versions, exhausted partition-key searches or metadata
+    budgets fall back to partitioning affected batches by group, with null
+    groupKey values. This preserves the batch schedule but may leave some
+    partitions empty.
 
-    batch_size is stored as metadata for the Neo4j connector. Only schedule
-    identifiers and candidate partition keys are collected on the driver.
+    batch_size is stored as metadata for the Neo4j connector. Only per-batch
+    counts and bounded candidate partition keys are collected on the driver.
+
+    Without staging_path, preparation uses a temporary disk-only cache sorted
+    by batch so Spark can skip decoding unrelated cached blocks. Returned
+    batches use ``cache``. Peak storage can include both the intermediate
+    and completed batches. All batches are
+    materialized before return unless ``cache=StorageLevel.NONE``, which permits
+    recomputation during shipping. Large loads need sufficient executor disk,
+    shuffle capacity, and an appropriate ``spark.sql.shuffle.partitions`` value.
 
     You can also use this to write the target Node's to Neo4j, before creating the relationships.
     For example, if you have a (:Person)-[:PEFORMED]-(:Action) relationships, you could use the below
@@ -69,6 +79,7 @@ def group_and_batch_spark_dataframe(
     ingest_spark_dataframe(
         batched,
         save_mode="Overwrite",
+        unpersist=False,
         options={
             "query": NODE_QUERY,
             "transaction.retries": 5,
@@ -111,9 +122,19 @@ def group_and_batch_spark_dataframe(
     batch_size : int
         Neo4j transaction size saved in the batch column metadata.
     cache: { See ```pyspark.sql.DataFrame.persist``` and ```pyspark.StorageLevel```}
-        Controls the level of persistence, and therefore caching, for the schedule dataframe
+        Controls persistence of the returned batch DataFrames.
         Defaults to ```StorageLevel.MEMORY_AND_DISK```, which uses disk and memory, with no replication.
         Use ```StorageLevel.NONE``` to disabling caching the partitions, if needed.
+
+    staging_path : str or None, default None
+        Optional new directory on storage shared by every executor. Writes
+        intermediate Parquet (requiring Parquet-compatible input types)
+        partitioned by batch so each batch reads only
+        its own files, avoiding repeated disk-cache reads. Existing paths
+        are rejected. Shipping with unpersist=True deletes this directory
+        after releasing all batches, including on write failure. False
+        retains caches and files for another pass or retry. Do not reuse
+        staged batches after shipping has cleaned them up.
 
     Returns
     -------
@@ -139,7 +160,7 @@ def group_and_batch_spark_dataframe(
             batch_size=batch_size,
         )
 
-        return _apply_repartitioning(grouped, cache=cache)
+        return _apply_repartitioning(grouped, cache=cache, staging_path=staging_path)
     else:
         from ._grouping_fallback import _apply_repartitioning, _create_node_groupings_v2
 
@@ -151,4 +172,4 @@ def group_and_batch_spark_dataframe(
             batch_size=batch_size,
         )
 
-        return _apply_repartitioning(grouped, cache=cache)
+        return _apply_repartitioning(grouped, cache=cache, staging_path=staging_path)

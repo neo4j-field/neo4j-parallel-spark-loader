@@ -12,16 +12,14 @@ from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.functions import (
     col,
-    collect_list,
     concat,
     greatest,
     least,
     lit,
     pmod,
-    sort_array,
     xxhash64,
 )
-from pyspark.sql.types import Row
+from ._scheduling import _join_group_keys, _rank_groups, _repartition_batches
 
 logging.basicConfig(
     force=True,
@@ -88,9 +86,9 @@ def _create_node_groupings_v2(
 
     Notes
     -----
-    Collects the distinct batch/group schedule on the driver to assign keys.
-    Relationship rows remain distributed. This function does not repartition
-    the returned rows; ``_apply_repartitioning`` performs that step.
+    Ranks distinct groups within each batch in Spark and collects only batch
+    counts on the driver. Relationship rows and group identifiers stay
+    distributed. This function does not repartition the returned rows; ``_apply_repartitioning`` performs that step.
 
     Examples
     --------
@@ -240,96 +238,19 @@ def _create_node_groupings_v2(
         .withMetadata("batch", {"neo4j_batch_size": batch_size})
     )
 
-    # Only observed groups need partitions; collect their identifiers, not rows.
-    schedule = (
-        grouped.select("batch", "group")
-        .distinct()
-        .groupBy("batch")
-        .agg(sort_array(collect_list("group")).alias("groups"))
-        .collect()
-    )
-
-    # Each group belongs to exactly one batch, so group alone is a valid key.
-    key_rows = [
-        (group, key) for entry in schedule for key, group in enumerate(entry["groups"])
-    ]
-    group_keys = df.sparkSession.createDataFrame(key_rows, "group string, groupKey int")
-    return grouped.drop("groupKey").join(group_keys, on="group", how="left")
+    schedule, counts = _rank_groups(grouped)
+    group_keys = schedule.select("group", F.col("ordinal").alias("groupKey"))
+    return _join_group_keys(grouped, group_keys, sum(row["count"] for row in counts))
 
 
 def _apply_repartitioning(
     spark_dataframe: DataFrame,
     cache: StorageLevel = StorageLevel.MEMORY_AND_DISK,
+    staging_path: str | None = None,
 ) -> list[DataFrame]:
-    logging.info(f"Repartitioning and persisting the DF using strategy: {cache!s}")
-
-    scheduled_df = spark_dataframe.repartition("batch").persist(cache)
-
-    logging.info("Finished repartitioning the full dataset on the `batch` key.")
-
-    logging.info("Generating the schedule for the dataset.")
-    try:
-        schedule: list[Row] = (
-            scheduled_df.select("batch", "group")
-            .distinct()
-            .groupBy("batch")
-            .agg(sort_array(collect_list("group")).alias("groups"))
-            .orderBy("batch")
-            .collect()
-        )
-        """
-      Example Schedule
-      ----------
-      Row(batch='0', groups=['0-
-        -0', '10--91', '11--90', '12--89', '13--88', '14--87', '15--86', '16--85', '17--84', '18--83', '19--82', '2--99', '20--81',
-        '21--80', '22--79', '23--78', '24--77', '25--76', '26--75', '27--74', '28--73', '29--72', '3--98', '30--71', '31--70', '32--
-        69', '33--68', '34--67', '35--66', '36--65', '37--64', '38--63', '39--62', '4--97', '40--61', '41--60', '42--59', '43--58',
-        '44--57', '45--56', '46--55', '47--54', '48--53', '49--52', '5--96', '50--51', '6--95', '7--94', '8--93', '9--92']),
-
-      Row(batch='1', groups=['0--1', '10--92', '11--91', '12--90', '13--89', '14--88', '15--87', '16--86', '17--85', '18--84',
-        '19--83', '20--82', '21--81', '22--80', '23--79', '24--78', '25--77', '26--76', '27--75', '28--74', '29--73', '3--99', '30--
-        72', '31--71', '32--70', '33--69', '34--68', '35--67', '36--66', '37--65', '38--64', '39--63', '4--98', '40--62', '41--61',
-        '42--60', '43--59', '44--58', '45--57', '46--56', '47--55', '48--54', '49--53', '5--97', '50--52', '51--51', '6--96', '7--95',
-        '8--94', '9--93']), 
-      """
-        logging.info(
-            "Finished generating the schedule for the dataset. Set logging to DEBUG to log the schedule."
-        )
-        logging.debug(schedule)
-
-        logging.info(f"Applying per-batch repartitioning, using strategy {cache!s}")
-        total_batches = len(schedule)
-        completed = 0
-        batches = []
-        for entry in schedule:
-            logging.debug(f"Batch has {len(entry['groups'])} groups")
-            partition_count = len(entry["groups"])
-            partition = (
-                scheduled_df.filter(col("batch") == entry["batch"])
-                .repartitionById(
-                    partition_count,
-                    col("groupKey"),
-                )
-                .persist(cache)
-            )
-            batches.append(partition)
-            partition.count()  # Force computation now, so that each batch is cached here, instead of computed at shipping
-            completed += 1
-            logging.info(
-                f"Finished repartitioning {completed}/{total_batches}, with {len(entry['groups'])} groups"
-            )
-
-        logging.info("Finished applying per-batch repartitioning.")
-
-        return batches
-    except Exception:
-        for batch in batches:
-            batch.unpersist(
-                blocking=False
-            )  # Ensure any batch creation failure unpersists all already created batches
-        raise
-    finally:
-        scheduled_df.unpersist(blocking=False)
+    return _repartition_batches(
+        spark_dataframe, cache, direct=True, staging_path=staging_path
+    )
 
 
 def group_and_batch_spark_dataframe(
@@ -339,6 +260,7 @@ def group_and_batch_spark_dataframe(
     num_groups: int,
     batch_size: int = 20000,
     cache: StorageLevel = StorageLevel.MEMORY_AND_DISK,
+    staging_path: str | None = None,
 ) -> list[DataFrame]:
     """Add a collision-safe execution schedule to a relationship DataFrame.
 
@@ -355,8 +277,16 @@ def group_and_batch_spark_dataframe(
     groupKey. Each groupKey directly identifies a distinct partition within its batch
     when using that batch's observed group count as the partition count.
 
-    batch_size is stored as metadata for the Neo4j connector. Only schedule
-    identifiers are collected on the driver. Requires Spark 4.1 or later.
+    batch_size is stored as metadata for the Neo4j connector. Only per-batch
+    counts are collected on the driver. Requires Spark 4.1 or later.
+
+    Without staging_path, preparation uses a temporary disk-only cache sorted
+    by batch so Spark can skip decoding unrelated cached blocks. Returned
+    batches use ``cache``. Peak storage can include both the intermediate
+    and completed batches. All batches are
+    materialized before return unless ``cache=StorageLevel.NONE``, which permits
+    recomputation during shipping. Large loads need sufficient executor disk,
+    shuffle capacity, and an appropriate ``spark.sql.shuffle.partitions`` value.
 
     You can also use this to write the target Node's to Neo4j, before creating the relationships.
     For example, if you have a (:Person)-[:PEFORMED]-(:Action) relationships, you could use the below
@@ -387,6 +317,7 @@ def group_and_batch_spark_dataframe(
     ingest_spark_dataframe(
         batched,
         save_mode="Overwrite",
+        unpersist=False,
         options={
             "query": NODE_QUERY,
             "transaction.retries": 5,
@@ -433,6 +364,16 @@ def group_and_batch_spark_dataframe(
         Defaults to ```StorageLevel.MEMORY_AND_DISK```, which uses disk and memory, with no replication.
         Use ```StorageLevel.NONE``` to disabling caching the partitions, if needed.
 
+    staging_path : str or None, default None
+        Optional new directory on storage shared by every executor. Writes
+        intermediate Parquet (requiring Parquet-compatible input types)
+        partitioned by batch so each batch reads only
+        its own files, avoiding repeated disk-cache reads. Existing paths
+        are rejected. Shipping with unpersist=True deletes this directory
+        after releasing all batches, including on write failure. False
+        retains caches and files for another pass or retry. Do not reuse
+        staged batches after shipping has cleaned them up.
+
     Returns
     -------
     list[DataFrame]
@@ -453,4 +394,4 @@ def group_and_batch_spark_dataframe(
         batch_size=batch_size,
     )
 
-    return _apply_repartitioning(grouped, cache=cache)
+    return _apply_repartitioning(grouped, cache=cache, staging_path=staging_path)
