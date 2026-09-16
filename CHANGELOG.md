@@ -19,6 +19,7 @@
 
 ### Added
 
+* `ingest_spark_dataframe` and `build_relationship` accept `sort_columns`. Each group's rows are sorted by these columns, typically the source node id, within their partition before being written. Hash grouping otherwise leaves rows in random order, so consecutive relationships touch unrelated node records and dirty a fresh page almost every row; sorting keeps Neo4j checkpoints short under a sustained write load. Grouping and batching are unchanged, so the deadlock-free guarantee is unaffected.
 * Opt-in `strategy="hash"` grouping strategy for `bipartite`, `monopartite`, and `predefined_components` `group_and_batch_spark_dataframe`/`create_node_groupings`, and for `build_relationship`. Computes group assignments entirely in Spark using `hash(id) % num_groups`, with no `collect()` to the driver and no join back against the source DataFrame. Scales to very large distinct-ID counts at the cost of not balancing group sizes; the default `strategy="greedy"` is unchanged.
 
 ## v0.5.2

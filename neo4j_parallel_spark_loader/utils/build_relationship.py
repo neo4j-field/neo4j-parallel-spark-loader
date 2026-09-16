@@ -25,6 +25,7 @@ def build_relationship(
     strategy: Literal["greedy", "hash"] = "greedy",
     on_null_batch: Literal["raise", "skip"] = "raise",
     checkpoint_path: Optional[str] = None,
+    sort_columns: Optional[List[str]] = None,
 ) -> None:
     """Build a relationship between two nodes.
     Params:
@@ -51,6 +52,10 @@ def build_relationship(
             once as Parquet partitioned by batch and each batch is read back from there
             instead of recomputing the input. Recommended for very large DataFrames.
             By default None
+        sort_columns: Optional[List[str]], optional
+            Passed to `ingest_spark_dataframe`. Sorts each group's rows by these columns
+            before writing, typically the source node id, to improve write locality on
+            Neo4j. By default None
     """
     options = {
         "relationship": relationship_name,
@@ -86,6 +91,7 @@ def build_relationship(
             options=options,
             on_null_batch=on_null_batch,
             checkpoint_path=checkpoint_path,
+            sort_columns=sort_columns,
         )
     else:
         print("Building in series")

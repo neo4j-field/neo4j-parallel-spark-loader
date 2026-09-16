@@ -77,6 +77,8 @@ ingest_spark_dataframe(
 
 If the job fails partway through, the checkpoint is still there. Read it back, filter to the batches that did not finish, and pass the result to `ingest_spark_dataframe()` again without a `checkpoint_path`. Delete the checkpoint once the load is complete.
 
+For sustained loads of hundreds of millions of relationships, also pass `sort_columns=[source_col]`. Hash grouping leaves rows in random order, so each transaction touches unrelated node records and dirties a fresh page almost every row, and Neo4j's checkpoints grow until commits are waiting on disk. Sorting each group by the source id makes consecutive rows update the same node record and relationship chain, so each transaction dirties far fewer pages. The sort is local to each partition and does not change grouping or batching.
+
 Progress is logged per batch at INFO level through the `neo4j_parallel_spark_loader.utils.ingest` logger.
 
 ### Predefined components scenario
