@@ -47,11 +47,11 @@ def ingest_spark_dataframe(
     options : dict
         Options passed to ``org.neo4j.spark.DataSource``.
     resume_from : int or None, default 0
-        Zero-based index in the supplied batch list, not the batch column value.
-        ``None`` and zero start from the beginning. For a failure logged as
-        batch 3/N, use ``resume_from=2`` to retry that batch. The same ordered
-        input batches must be supplied. An index equal to ``len(batches)``
-        writes nothing; negative or larger indices are rejected.
+        One-based batch number shown in the shipping logs, not the batch column
+        value. ``None``, zero, and one start from the beginning. For a failure
+        logged as batch 3/N, use ``resume_from=3`` to retry that batch. The same
+        ordered input batches must be supplied. ``len(batches)`` retries the
+        final batch; negative numbers or numbers above that limit are rejected.
         Skipped batches are also unpersisted. Retrying a partly completed batch
         can repeat writes, so use an idempotent query when resuming.
     """
@@ -59,11 +59,12 @@ def ingest_spark_dataframe(
     if save_mode not in {"Append", "Overwrite"}:
         raise ValueError("save_mode must be either 'Append' or 'Overwrite'")
 
-    start = 0 if resume_from is None else resume_from
-    if isinstance(start, bool) or not isinstance(start, int):
+    batch_number = 0 if resume_from is None else resume_from
+    if isinstance(batch_number, bool) or not isinstance(batch_number, int):
         raise TypeError("resume_from must be an integer or None")
-    if not 0 <= start <= len(batches):
+    if not 0 <= batch_number <= len(batches):
         raise ValueError(f"resume_from must be between 0 and {len(batches)}")
+    start = max(0, batch_number - 1)
 
     if not batches:
         raise ValueError("No batches where passed to ```ingest_spark_dataframe```.")
@@ -77,9 +78,6 @@ def ingest_spark_dataframe(
     total_batches = len(batches)
     cleanup_from = 0
     try:
-        if start == total_batches:
-            return
-
         write_options = dict(options)
         batch_size = batches[start].schema["batch"].metadata.get("neo4j_batch_size")
         if batch_size is not None:
@@ -103,6 +101,6 @@ def ingest_spark_dataframe(
                 cleanup_from = index + 1
                 batch.unpersist(blocking=False)
     finally:
-        # Release batches not reached when a write fails or all were skipped.
+        # Release batches not reached when a write fails.
         for batch in batches[cleanup_from:]:
             batch.unpersist(blocking=False)
