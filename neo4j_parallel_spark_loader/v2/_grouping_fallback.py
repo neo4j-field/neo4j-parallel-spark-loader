@@ -320,7 +320,7 @@ def _apply_repartitioning(
 ) -> list[DataFrame]:
     logging.info(f"Repartitioning and persisting the DF using strategy: {cache!s}")
 
-    scheduled_df = spark_dataframe.repartition("batch").persist(cache)
+    scheduled_df = spark_dataframe.repartition("batch")
 
     logging.info("Finished repartitioning the full dataset on the `batch` key.")
 
