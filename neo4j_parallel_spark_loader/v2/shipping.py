@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Literal
+from typing import Any, Dict, Literal, Optional
 
 from pyspark.sql import DataFrame
 
@@ -15,6 +15,7 @@ def ingest_spark_dataframe(
     batches: list[DataFrame],
     save_mode: Literal["Overwrite", "Append"],
     options: Dict[str, Any] = {},
+    resume_from: Optional[int] = 0,
 ) -> None:
     """Write a scheduled Spark DataFrame to Neo4j without lock collisions.
 
@@ -39,21 +40,33 @@ def ingest_spark_dataframe(
 
     Parameters
     ----------
-    spark_dataframe : DataFrame
-        Scheduled rows containing ``batch`` and ``group`` columns.
-    schedule: DataFrame
-        The precomputed shipping schedule for the DataFrame, as given by ```v2.grouping.group_and_batch_spark_dataframe```
+    batches : list[DataFrame]
+        Ordered batches returned by ``v2.grouping.group_and_batch_spark_dataframe``.
     save_mode : {"Overwrite", "Append"}
         Spark save mode passed to the Neo4j connector.
     options : dict
         Options passed to ``org.neo4j.spark.DataSource``.
+    resume_from : int or None, default 0
+        Zero-based index in the supplied batch list, not the batch column value.
+        ``None`` and zero start from the beginning. For a failure logged as
+        batch 3/N, use ``resume_from=2`` to retry that batch. The same ordered
+        input batches must be supplied. An index equal to ``len(batches)``
+        writes nothing; negative or larger indices are rejected.
+        Skipped batches are also unpersisted. Retrying a partly completed batch
+        can repeat writes, so use an idempotent query when resuming.
     """
 
     if save_mode not in {"Append", "Overwrite"}:
         raise ValueError("save_mode must be either 'Append' or 'Overwrite'")
 
+    start = 0 if resume_from is None else resume_from
+    if isinstance(start, bool) or not isinstance(start, int):
+        raise TypeError("resume_from must be an integer or None")
+    if not 0 <= start <= len(batches):
+        raise ValueError(f"resume_from must be between 0 and {len(batches)}")
+
     if not batches:
-        return
+        raise ValueError("No batches where passed to ```ingest_spark_dataframe```.")
 
     for batch in batches:
         if "batch" not in batch.columns:
@@ -61,27 +74,35 @@ def ingest_spark_dataframe(
         if "group" not in batch.columns:
             raise ValueError("Spark DataFrame must contain column `group`")
 
-    write_options = dict(options)
-    batch_size = batches[0].schema["batch"].metadata.get("neo4j_batch_size")
-    if batch_size is not None:
-        write_options.setdefault("batch.size", str(batch_size))
-
-    logging.info(f"Starting run with configuration: {write_options!s}")
-
     total_batches = len(batches)
-    completed = 1
-    for batch in batches:
-        try:
-            logging.info(f"Started shipping batch {completed}/{total_batches}")
-            (
-                batch.write.mode(save_mode)
-                .format("org.neo4j.spark.DataSource")
-                .options(**write_options)
-                .save()
-            )
-            logging.info(f"Finished shipping batch {completed}/{total_batches}")
-            completed += 1
-        finally:
-            # This is the double repartitioned DataFrame, persisted using `cache` arg,
-            # that we created just for this ingestion
+    cleanup_from = 0
+    try:
+        if start == total_batches:
+            return
+
+        write_options = dict(options)
+        batch_size = batches[start].schema["batch"].metadata.get("neo4j_batch_size")
+        if batch_size is not None:
+            write_options.setdefault("batch.size", str(batch_size))
+        logging.info(f"Starting run with configuration: {write_options!s}")
+
+        for index, batch in enumerate(batches):
+            try:
+                if index < start:
+                    continue
+                completed = index + 1
+                logging.info(f"Started shipping batch {completed}/{total_batches}")
+                (
+                    batch.write.mode(save_mode)
+                    .format("org.neo4j.spark.DataSource")
+                    .options(**write_options)
+                    .save()
+                )
+                logging.info(f"Finished shipping batch {completed}/{total_batches}")
+            finally:
+                cleanup_from = index + 1
+                batch.unpersist(blocking=False)
+    finally:
+        # Release batches not reached when a write fails or all were skipped.
+        for batch in batches[cleanup_from:]:
             batch.unpersist(blocking=False)

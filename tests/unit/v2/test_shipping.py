@@ -108,3 +108,68 @@ def test_writer_setup_failure_also_releases_batch():
         ingest_spark_dataframe([batch], "Append")
     batch.unpersist.assert_called_once_with(blocking=False)
     batch.write.save.assert_not_called()
+
+
+@pytest.mark.parametrize("resume_from", [None, 0, 1, 2, 3])
+def test_resume_writes_only_selected_suffix_and_releases_all_batches(resume_from, caplog):
+    batches = [make_batch({"neo4j_batch_size": 100 + i}) for i in range(3)]
+    original = list(batches)
+    start = resume_from or 0
+    events = []
+    for index, batch in enumerate(batches):
+        batch.write.save.side_effect = lambda i=index: events.append(i)
+
+    with caplog.at_level("INFO"):
+        ingest_spark_dataframe(batches, "Append", resume_from=resume_from)
+
+    assert batches == original
+    assert events == list(range(start, 3))
+    for index, batch in enumerate(batches):
+        batch.unpersist.assert_called_once_with(blocking=False)
+        if index < start:
+            batch.write.mode.assert_not_called()
+        else:
+            batch.write.options.assert_called_once_with(**{"batch.size": str(100 + start)})
+            assert f"Started shipping batch {index + 1}/3" in caplog.text
+
+
+@pytest.mark.parametrize("resume_from", [-1, 4])
+def test_resume_rejects_out_of_range_offsets_before_writing(resume_from):
+    batches = [make_batch() for _ in range(3)]
+    with pytest.raises(ValueError, match="resume_from"):
+        ingest_spark_dataframe(batches, "Append", resume_from=resume_from)
+    for batch in batches:
+        batch.write.mode.assert_not_called()
+
+
+@pytest.mark.parametrize("resume_from", [True, False, 1.5, "1"])
+def test_resume_rejects_noninteger_offsets(resume_from):
+    batch = make_batch()
+    with pytest.raises(TypeError, match="resume_from"):
+        ingest_spark_dataframe([batch], "Append", resume_from=resume_from)
+    batch.write.mode.assert_not_called()
+
+
+@pytest.mark.parametrize("resume_from", [None, 0])
+def test_resume_empty_input_is_a_noop(resume_from):
+    ingest_spark_dataframe([], "Append", resume_from=resume_from)
+
+
+def test_resume_nonzero_offset_on_empty_input_is_rejected():
+    with pytest.raises(ValueError, match="resume_from"):
+        ingest_spark_dataframe([], "Append", resume_from=1)
+
+
+def test_resumed_write_failure_releases_skipped_current_and_remaining_batches():
+    batches = [make_batch() for _ in range(4)]
+    failure = RuntimeError("resumed write failed")
+    batches[2].write.save.side_effect = failure
+    with pytest.raises(RuntimeError, match="resumed write failed") as exc:
+        ingest_spark_dataframe(batches, "Append", resume_from=1)
+    assert exc.value is failure
+    batches[0].write.mode.assert_not_called()
+    batches[1].write.save.assert_called_once_with()
+    batches[2].write.save.assert_called_once_with()
+    batches[3].write.mode.assert_not_called()
+    for batch in batches:
+        batch.unpersist.assert_called_once_with(blocking=False)

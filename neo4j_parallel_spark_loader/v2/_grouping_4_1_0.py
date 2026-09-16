@@ -268,58 +268,66 @@ def _apply_repartitioning(
     logging.info("Finished repartitioning the full dataset on the `batch` key.")
 
     logging.info("Generating the schedule for the dataset.")
-    schedule: list[Row] = (
-        scheduled_df.select("batch", "group")
-        .distinct()
-        .groupBy("batch")
-        .agg(sort_array(collect_list("group")).alias("groups"))
-        .orderBy("batch")
-        .collect()
-    )
-    """
-    Example Schedule
-    ----------
-    Row(batch='0', groups=['0-
-      -0', '10--91', '11--90', '12--89', '13--88', '14--87', '15--86', '16--85', '17--84', '18--83', '19--82', '2--99', '20--81',
-      '21--80', '22--79', '23--78', '24--77', '25--76', '26--75', '27--74', '28--73', '29--72', '3--98', '30--71', '31--70', '32--
-      69', '33--68', '34--67', '35--66', '36--65', '37--64', '38--63', '39--62', '4--97', '40--61', '41--60', '42--59', '43--58',
-      '44--57', '45--56', '46--55', '47--54', '48--53', '49--52', '5--96', '50--51', '6--95', '7--94', '8--93', '9--92']),
-
-    Row(batch='1', groups=['0--1', '10--92', '11--91', '12--90', '13--89', '14--88', '15--87', '16--86', '17--85', '18--84',
-      '19--83', '20--82', '21--81', '22--80', '23--79', '24--78', '25--77', '26--76', '27--75', '28--74', '29--73', '3--99', '30--
-      72', '31--71', '32--70', '33--69', '34--68', '35--67', '36--66', '37--65', '38--64', '39--63', '4--98', '40--62', '41--61',
-      '42--60', '43--59', '44--58', '45--57', '46--56', '47--55', '48--54', '49--53', '5--97', '50--52', '51--51', '6--96', '7--95',
-      '8--94', '9--93']), 
-    """
-    logging.info(
-        "Finished generating the schedule for the dataset. Set logging to DEBUG to log the schedule."
-    )
-    logging.debug(schedule)
-
-    logging.info(f"Applying per-batch repartitioning, using strategy {cache!s}")
-    total_batches = len(schedule)
-    completed = 0
-    batches = []
-    for entry in schedule:
-        logging.debug(f"Batch has {len(entry['groups'])} groups")
-        partition_count = len(entry["groups"])
-        partition = (
-            scheduled_df.filter(col("batch") == entry["batch"])
-            .repartitionById(
-                partition_count,
-                col("groupKey"),
-            )
-            .persist(cache)
+    try:
+        schedule: list[Row] = (
+            scheduled_df.select("batch", "group")
+            .distinct()
+            .groupBy("batch")
+            .agg(sort_array(collect_list("group")).alias("groups"))
+            .orderBy("batch")
+            .collect()
         )
-        batches.append(partition)
-        completed += 1
+        """
+      Example Schedule
+      ----------
+      Row(batch='0', groups=['0-
+        -0', '10--91', '11--90', '12--89', '13--88', '14--87', '15--86', '16--85', '17--84', '18--83', '19--82', '2--99', '20--81',
+        '21--80', '22--79', '23--78', '24--77', '25--76', '26--75', '27--74', '28--73', '29--72', '3--98', '30--71', '31--70', '32--
+        69', '33--68', '34--67', '35--66', '36--65', '37--64', '38--63', '39--62', '4--97', '40--61', '41--60', '42--59', '43--58',
+        '44--57', '45--56', '46--55', '47--54', '48--53', '49--52', '5--96', '50--51', '6--95', '7--94', '8--93', '9--92']),
+
+      Row(batch='1', groups=['0--1', '10--92', '11--91', '12--90', '13--89', '14--88', '15--87', '16--86', '17--85', '18--84',
+        '19--83', '20--82', '21--81', '22--80', '23--79', '24--78', '25--77', '26--76', '27--75', '28--74', '29--73', '3--99', '30--
+        72', '31--71', '32--70', '33--69', '34--68', '35--67', '36--66', '37--65', '38--64', '39--63', '4--98', '40--62', '41--61',
+        '42--60', '43--59', '44--58', '45--57', '46--56', '47--55', '48--54', '49--53', '5--97', '50--52', '51--51', '6--96', '7--95',
+        '8--94', '9--93']), 
+      """
         logging.info(
-            f"Finished repartitioning {completed}/{total_batches}, with {len(entry['groups'])} groups"
+            "Finished generating the schedule for the dataset. Set logging to DEBUG to log the schedule."
         )
+        logging.debug(schedule)
 
-    logging.info("Finished applying per-batch repartitioning.")
+        logging.info(f"Applying per-batch repartitioning, using strategy {cache!s}")
+        total_batches = len(schedule)
+        completed = 0
+        batches = []
+        for entry in schedule:
+            logging.debug(f"Batch has {len(entry['groups'])} groups")
+            partition_count = len(entry["groups"])
+            partition = (
+                scheduled_df.filter(col("batch") == entry["batch"])
+                .repartitionById(
+                    partition_count,
+                    col("groupKey"),
+                )
+                .persist(cache)
+            )
+            batches.append(partition)
+            partition.count()  # Force computation now, so that each batch is cached here, instead of computed at shipping
+            completed += 1
+            logging.info(
+                f"Finished repartitioning {completed}/{total_batches}, with {len(entry['groups'])} groups"
+            )
 
-    return batches
+        logging.info("Finished applying per-batch repartitioning.")
+
+        return batches
+    except Exception:
+        for batch in batches:
+            batch.unpersist()  # Ensure any batch creation failure unpersists all already created batches
+        raise
+    finally:
+        scheduled_df.unpersist()
 
 
 def group_and_batch_spark_dataframe(
