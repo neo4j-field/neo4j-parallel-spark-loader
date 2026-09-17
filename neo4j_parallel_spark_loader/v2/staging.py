@@ -30,6 +30,19 @@ def load_staged_batches(
     including on write failure. Invalid or unreadable staging is never deleted
     by this function. Do not load the same staging path into concurrent runs:
     each run's shipping cleanup assumes exclusive use of the directory.
+
+    Parameters
+    ----------
+    spark: ```SparkSession```
+        The spark session to use
+    staging_path : str
+        The path to the staging directory, or location.
+        `s3://` also works on runtimes configured to support that scheme.
+    cache: { See ```pyspark.sql.DataFrame.persist``` and ```pyspark.StorageLevel```}
+        Controls persistence of the returned batch DataFrames and, without
+        staging_path, the temporary intermediate dataset.
+        Defaults to ```StorageLevel.MEMORY_AND_DISK```, which uses disk and memory, with no replication.
+        Use ```StorageLevel.NONE``` to disable both caches, if needed.
     """
     staging = _StagingDirectory(spark, staging_path)
     manifest = staging.read_manifest()

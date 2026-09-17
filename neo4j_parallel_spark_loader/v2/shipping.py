@@ -42,14 +42,14 @@ def ingest_spark_dataframe(
 
     Parameters
     ----------
-    batches : list[DataFrame]
+    batches : `list[DataFrame]`
         Ordered batches returned by ``group_and_batch_spark_dataframe`` or
         restored after a restart with ``load_staged_batches``.
     save_mode : {"Overwrite", "Append"}
         Spark save mode passed to the Neo4j connector.
-    options : dict
+    options : `dict`
         Options passed to ``org.neo4j.spark.DataSource``.
-    resume_from : int or None, default 0
+    resume_from : `int` or `None`, ```default=0```
         One-based batch number shown in the shipping logs, not the batch column
         value. ``None``, zero, and one start from the beginning. For a failure
         logged as batch 3/N, use ``resume_from=3`` to retry that batch. The same
@@ -59,7 +59,7 @@ def ingest_spark_dataframe(
         a partly completed batch can repeat writes, so use an idempotent query. Staged
         batches can only be retried if the previous call used unpersist=False;
         otherwise rebuild them because their staging files have been removed.
-    unpersist : bool, default True
+    unpersist : `bool`, ```default=True```
         Release all batch caches, including skipped and unwritten batches,
         on completion or failure. Delete loader-owned staging directories
         once all their original batches have been released. When False,

@@ -31,28 +31,27 @@ def group_and_batch_spark_dataframe(
     to write concurrently. Batches must be written serially. For an even bucket
     count, one unused bucket is added so the same colouring rule remains safe.
 
-    The returned batches contain the original columns plus group, batch, and
-    groupKey. Each groupKey hashes to a distinct partition within its batch
-    when using that batch's observed group count as the partition count.
+    The returned batches contain the original columns plus ```group```, ```batch```, and
+    ```groupKey```. Each ```groupKey``` hashes to a distinct partition within its ```batch```
+    when using that batch's observed ```group``` count as the partition count.
     On older Spark versions, exhausted partition-key searches or metadata
-    budgets fall back to partitioning affected batches by group, with null
-    groupKey values. This preserves the batch schedule but may leave some
+    budgets fall back to partitioning affected batches by ```group```, with null
+    ```groupKey``` values. This preserves the ```batch``` schedule but may leave some
     partitions empty.
 
-    batch_size is stored as metadata for the Neo4j connector. Only per-batch
+    ```batch_size``` is stored as metadata for the Neo4j connector. Only per-batch
     counts and bounded candidate partition keys are collected on the driver.
 
-    Without staging_path, preparation uses a temporary cache at the requested
+    Without ```staging_path```, preparation uses a temporary cache at the requested
     ``cache`` storage level, sorted by batch so Spark can skip decoding unrelated
     cached blocks. Returned batches also use ``cache``. Peak storage can include
-    both the intermediate
-    and completed batches. All batches are
+    both the intermediate and completed batches. All batches are
     materialized before return unless ``cache=StorageLevel.NONE``, which permits
     recomputation during shipping. Large loads need sufficient executor disk,
     shuffle capacity, and an appropriate ``spark.sql.shuffle.partitions`` value.
 
     You can also use this to write the target Node's to Neo4j, before creating the relationships.
-    For example, if you have a (:Person)-[:PEFORMED]-(:Action) relationships, you could use the below
+    For example, if you have a ```(:Person)```-```[:PEFORMED]```-```(:Action)``` relationships, you could use the below
     to ingest the nodes, and then the relationships:
 
     e.g.
@@ -127,7 +126,6 @@ def group_and_batch_spark_dataframe(
         staging_path, the temporary intermediate dataset.
         Defaults to ```StorageLevel.MEMORY_AND_DISK```, which uses disk and memory, with no replication.
         Use ```StorageLevel.NONE``` to disable both caches, if needed.
-
     staging_path : str or None, default None
         Optional new directory on storage shared by every executor. Writes
         intermediate Parquet (requiring Parquet-compatible input types)
@@ -142,7 +140,7 @@ def group_and_batch_spark_dataframe(
     -------
     list[DataFrame]
         A list of collision-safe DataFrame batches, calculated from the input DataFrame.
-        Each DataFrame is repartitioned from the source, and each each group is repartitioned within per batch-group.
+        Each DataFrame is repartitioned from the source, and each group is repartitioned within per batch-group.
     """
     if num_groups <= 0:
         raise ValueError("num_groups must be positive")
