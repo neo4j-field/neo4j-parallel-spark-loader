@@ -9,7 +9,7 @@ exclude = ["tests/*", "benchmarking/*", "docs/*", "examples/*", "Makefile"]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-pyspark = "^3.4.0"
+pyspark = ">=3.4,<5"
 numpy = "^1.2.0"
 
 

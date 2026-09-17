@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -63,3 +66,42 @@ jobs:
       - name: Run tests
         shell: bash
         run: make test
+
+  tests-pyspark-4:
+    name: v2 tests (PySpark 4.1+, Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.13']
+    env:
+      PYSPARK_PYTHON: python
+      PYSPARK_DRIVER_PYTHON: python
+      SPARK_LOCAL_IP: 127.0.0.1
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install PySpark 4.1+ test dependencies
+        # The Poetry lock targets Spark 3; v2 unit tests need no Neo4j connector.
+        run: python -m pip install 'pyspark>=4.1,<5' numpy pytest pytest-mock
+      - name: Verify direct partition assignment is available
+        run: |
+          python - <<'PY'
+          import pyspark
+          from pyspark.sql import DataFrame
+
+          print(f"Testing PySpark {pyspark.__version__}")
+          assert tuple(map(int, pyspark.__version__.split('.')[:2])) >= (4, 1)
+          assert callable(getattr(DataFrame, 'repartitionById', None))
+          PY
+      - name: Run v2 grouping and shipping tests
+        run: python -m pytest tests/unit/v2 -v
