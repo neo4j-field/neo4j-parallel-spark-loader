@@ -280,9 +280,10 @@ def group_and_batch_spark_dataframe(
     batch_size is stored as metadata for the Neo4j connector. Only per-batch
     counts are collected on the driver. Requires Spark 4.1 or later.
 
-    Without staging_path, preparation uses a temporary disk-only cache sorted
-    by batch so Spark can skip decoding unrelated cached blocks. Returned
-    batches use ``cache``. Peak storage can include both the intermediate
+    Without staging_path, preparation uses a temporary cache at the requested
+    ``cache`` storage level, sorted by batch so Spark can skip decoding unrelated
+    cached blocks. Returned batches also use ``cache``. Peak storage can include
+    both the intermediate
     and completed batches. All batches are
     materialized before return unless ``cache=StorageLevel.NONE``, which permits
     recomputation during shipping. Large loads need sufficient executor disk,
@@ -359,10 +360,10 @@ def group_and_batch_spark_dataframe(
     batch_size : int
         Neo4j transaction size saved in the batch column metadata.
     cache: { See ```pyspark.sql.DataFrame.persist``` and ```pyspark.StorageLevel```}
-        Controls the level of persistence, and therefore caching, for the partitioned and grouped ```DataFrame```.
-        If not persisted, the ```DataFrame``` will be recomputed at shipping time, which is not recommended.
+        Controls persistence of the returned batch DataFrames and, without
+        staging_path, the temporary intermediate dataset.
         Defaults to ```StorageLevel.MEMORY_AND_DISK```, which uses disk and memory, with no replication.
-        Use ```StorageLevel.NONE``` to disabling caching the partitions, if needed.
+        Use ```StorageLevel.NONE``` to disable both caches, if needed.
 
     staging_path : str or None, default None
         Optional new directory on storage shared by every executor. Writes

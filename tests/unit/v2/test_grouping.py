@@ -269,6 +269,33 @@ def test_only_small_group_schedules_are_forced_to_broadcast(
         v2_spark.conf.set("spark.sql.autoBroadcastJoinThreshold", previous)
 
 
+@pytest.mark.parametrize(
+    "cache", [StorageLevel.MEMORY_AND_DISK, StorageLevel.DISK_ONLY, StorageLevel.NONE]
+)
+def test_unstaged_preparation_honors_cache(v2_spark, monkeypatch, cache):
+    grouped = v2_spark.createDataFrame(
+        [("0", "a", 0), ("1", "b", 0)], ["batch", "group", "groupKey"]
+    )
+    build_batches = _scheduling._build_batches
+    intermediates = []
+
+    def inspect_intermediate(scheduled, *args, **kwargs):
+        assert scheduled.storageLevel == cache
+        intermediates.append(scheduled)
+        return build_batches(scheduled, *args, **kwargs)
+
+    monkeypatch.setattr(_scheduling, "_build_batches", inspect_intermediate)
+    batches = _scheduling._repartition_batches(grouped, cache, direct=False)
+    try:
+        assert intermediates[0].storageLevel == StorageLevel.NONE
+        assert len(batches) == 2
+        assert all(batch.storageLevel == cache for batch in batches)
+        assert [batch.collect()[0].group for batch in batches] == ["a", "b"]
+    finally:
+        for batch in batches:
+            batch.unpersist(blocking=True)
+
+
 @pytest.mark.parametrize("failure_stage", ["schedule", "materialize"])
 def test_preparation_failure_releases_intermediate_and_batch_caches(
     v2_spark, monkeypatch, failure_stage

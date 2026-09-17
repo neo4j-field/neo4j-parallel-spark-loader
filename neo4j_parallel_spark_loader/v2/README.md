@@ -30,6 +30,8 @@ batches = group_and_batch_spark_dataframe(
     target_col="targetId",
     num_groups=100,
     batch_size=20_000,
+    # Optional: persist intermediate data on storage shared by all executors.
+    # staging_path="s3a://my-bucket/neo4j-staging/unique-run-id",
 )
 
 # Create endpoint nodes, retaining batches for the relationship pass.
@@ -66,9 +68,15 @@ shared entities can still introduce lock contention.
   total Spark partitions. Returned batches include `group`, `batch`, and `groupKey`.
 - `batch_size` sets Neo4j's transaction size. An explicit `options["batch.size"]`
   overrides it. Other connector options can also be passed through `options`.
-- `cache` defaults to `StorageLevel.MEMORY_AND_DISK`. Batches are materialized
-  before grouping returns. Without caching, staged batches reread their Parquet
-  files and reapply partitioning; they do not regroup the original input.
+- `staging_path` defaults to `None`. Set it to a new, dedicated directory on
+  shared storage to write intermediate Parquet and enable resume after a restart
+  (see below).
+- `cache` defaults to `StorageLevel.MEMORY_AND_DISK` and controls returned batch
+  caches plus the temporary intermediate cache when `staging_path=None`.
+  With caching enabled, batches are materialized before grouping returns.
+  `StorageLevel.NONE` disables caching: without staging, shipping can recompute
+  the original input; with staging, batches reread their Parquet files and
+  reapply partitioning without regrouping the original input.
 - `unpersist=True` is the shipping default: it releases caches and deletes
   loader-owned staging after all associated batches are released, including on
   write failure. `False` retains both for another pass or retry. If you abandon
@@ -88,9 +96,11 @@ Staging writes Parquet partitioned by batch so each batch reads only its own
 files. Existing paths are rejected, and input types must support Parquet.
 Shipping with `unpersist=True` cleans up the staging path automatically.
 
-Without staging, grouping uses a temporary disk-only cache. Either approach
-needs sufficient disk and shuffle capacity; peak storage can include both the
-intermediate dataset and prepared batches.
+Without staging, grouping uses a temporary cache at the requested `cache`
+storage level and releases it before returning. With staging, intermediate data
+is written to Parquet regardless of `cache`; `cache` still controls returned
+batches. Either approach needs sufficient disk and shuffle capacity; peak
+storage can include both the intermediate dataset and prepared batches.
 
 ## Resume after restarting the process
 

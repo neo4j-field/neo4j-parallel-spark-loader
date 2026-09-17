@@ -168,8 +168,7 @@ def _repartition_batches(
     # Spread different groups across tasks instead of funneling a whole batch
     # through one task. Sorting clusters each batch within cached columnar
     # blocks, enabling Spark's min/max cache filtering for per-batch reads.
-    # Keep the temporary full copy on disk so it does not compete with the
-    # final batch caches for executor storage memory.
+    # Honor the requested storage level for both intermediate and final caches.
     scheduled = None
     staging = None
     try:
@@ -177,8 +176,9 @@ def _repartition_batches(
             scheduled = (
                 grouped.repartition("batch", "group")
                 .sortWithinPartitions("batch")
-                .persist(StorageLevel.DISK_ONLY)
             )
+            if cache != StorageLevel.NONE:
+                scheduled = scheduled.persist(cache)
         else:
             # Resolve cleanup through Hadoop so local and remote paths work.
             # Claim ownership only after the write succeeds; an existing path
