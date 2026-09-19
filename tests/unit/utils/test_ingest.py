@@ -263,3 +263,85 @@ def test_ingest_rejects_unknown_sort_column(spark_fixture: SparkSession) -> None
     )
     with pytest.raises(AssertionError, match="sort column `nope` is not in"):
         ingest_spark_dataframe(sdf, "Append", options={}, sort_columns=["nope"])
+
+
+def test_ingest_checkpoint_and_sort_columns_together(
+    spark_fixture: SparkSession, mocker: MockerFixture, tmp_path: Path
+) -> None:
+    """`checkpoint_path` and `sort_columns` are independent features; verify the sort still
+    holds once rows have made the round trip through the checkpoint's Parquet read-back."""
+    sdf = spark_fixture.range(3000).selectExpr(
+        "cast(id * 7919 % 211 as string) as src",
+        "cast(id * 104729 % 389 as string) as tgt",
+    )
+    grouped = group_and_batch_bipartite(sdf, "src", "tgt", 4, strategy="hash")
+    checkpoint = tmp_path / "checkpoint"
+
+    captured = _capture_neo4j_saves(mocker)
+    ingest_spark_dataframe(
+        grouped,
+        "Append",
+        options={},
+        checkpoint_path=str(checkpoint),
+        sort_columns=["src"],
+    )
+
+    assert captured
+    for batch_df in captured:
+        _assert_one_group_per_partition(batch_df)
+        for partition in batch_df.select("src").rdd.glom().collect():
+            values = [row["src"] for row in partition]
+            assert values == sorted(values)
+
+
+def test_ingest_checkpoint_resume_after_partial_failure(
+    spark_fixture: SparkSession, mocker: MockerFixture, tmp_path: Path
+) -> None:
+    """
+    Exercises the resume workflow documented on `checkpoint_path`: read the checkpoint back,
+    filter to the batches that were not yet written, and pass the result to
+    `ingest_spark_dataframe` again.
+    """
+    sdf = spark_fixture.range(1000).selectExpr(
+        "cast(id % 97 as string) as src", "cast(id % 89 as string) as tgt"
+    )
+    grouped = group_and_batch_bipartite(sdf, "src", "tgt", 4, strategy="hash")
+    checkpoint = tmp_path / "checkpoint"
+
+    # first attempt writes the checkpoint; pretend only batches 0 and 1 made it to Neo4j
+    # before the job died (e.g. a driver crash after some batches finished writing)
+    captured_first = _capture_neo4j_saves(mocker)
+    ingest_spark_dataframe(
+        grouped, "Append", options={}, checkpoint_path=str(checkpoint)
+    )
+    assert len(captured_first) == 4
+    succeeded_batches = [0, 1]
+
+    # resume: read the checkpoint back and filter to the batches that never completed
+    checkpoint_df = spark_fixture.read.parquet(str(checkpoint))
+    remaining = checkpoint_df.filter(~col("batch").isin(succeeded_batches))
+    expected_remaining_count = remaining.count()
+    assert 0 < expected_remaining_count < grouped.count()
+
+    captured_resume = _capture_neo4j_saves(mocker)
+    ingest_spark_dataframe(remaining, "Append", options={})
+
+    resumed_batches = {
+        row["batch"]
+        for df in captured_resume
+        for row in df.select("batch").distinct().collect()
+    }
+    assert resumed_batches == {2, 3}
+    assert sum(df.count() for df in captured_resume) == expected_remaining_count
+
+
+def test_ingest_empty_dataframe_is_a_no_op(
+    spark_fixture: SparkSession, mocker: MockerFixture
+) -> None:
+    sdf = spark_fixture.createDataFrame([], "src string, tgt string")
+    grouped = group_and_batch_bipartite(sdf, "src", "tgt", 4, strategy="hash")
+
+    captured = _capture_neo4j_saves(mocker)
+    ingest_spark_dataframe(grouped, "Append", options={})
+
+    assert captured == []
