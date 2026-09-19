@@ -3,10 +3,24 @@
 ### Fixed
 
 * Bump `fonttools`, `idna`, `pillow`, `pygments`, `pytest`, `python-dotenv`, `requests`, `setuptools`, `tornado`, and `urllib3` to patched versions in `poetry.lock`, resolving 45 open Dependabot alerts. All are transitive dependencies of the `dev`/`benchmarking` Poetry groups (via `ipykernel`, `seaborn`, `requests`, `neo4j`); none are runtime dependencies of the published package.
+* `ingest_spark_dataframe` now writes every group in a batch from its own Spark partition. Previously each batch was `repartition(num_groups, "group")`, and because Spark places rows by hashing the column, roughly a third of the partitions were empty while others held two or three groups, so a batch ran at the speed of its most crowded partition. Each group is now mapped to a long key known to hash to a distinct partition, so a batch with `k` groups runs as exactly `k` parallel writers.
+* `build_relationship` counts the DataFrame once instead of twice.
+* `ingest_spark_dataframe` no longer silently drops rows whose `batch` is `null` (rows with a `null` node id or partition value that could not be assigned to a group). It now counts them in the same pass that collects the batch schedule and raises a `ValueError` before writing anything. Pass `on_null_batch="skip"` to warn and ingest the remaining rows instead.
+* Monopartite grouping now assigns a `null` `group` when either the source or target id is `null`. Previously `least`/`greatest` skipped the `null` side, so such rows landed in a real self-loop group (for example `"3 -- 3"`) and were sent to Neo4j.
 
 ### Changed
 
+* `ingest_spark_dataframe` accepts `checkpoint_path`. When set, the grouped DataFrame is written once as Parquet partitioned by `batch` and each batch is read back from there, so the input plan is not recomputed once per batch. The checkpoint can also be used to resume a failed load. `build_relationship` passes `checkpoint_path` and `on_null_batch` through.
+* `ingest_spark_dataframe` reports progress per batch through the `neo4j_parallel_spark_loader.utils.ingest` logger.
+* The `num_groups` parameter of `ingest_spark_dataframe` is deprecated and ignored. The partition count for each batch is now the number of groups observed in that batch.
+* `ingest_spark_dataframe` treats a `null` `group` the same as a `null` `batch`. In the predefined components scenario rows with a `null` partition value have `batch` 0 but a `null` group, and were previously written alongside real groups.
+* Monopartite `create_node_groupings` with `strategy="hash"` raises a `TypeError` when the source and target id columns have different data types. Spark's `hash()` depends on the type, so the same id would otherwise land in different groups and break the deadlock-free guarantee.
+* Bipartite and monopartite `create_ingest_batches_from_groups` functions accept an optional `known_group_count` parameter to skip a `distinct().count()` pass when the number of groups is already known (used by the "hash" grouping strategy).
+
 ### Added
+
+* `ingest_spark_dataframe` and `build_relationship` accept `sort_columns`. Each group's rows are sorted by these columns, typically the source node id, within their partition before being written. Hash grouping otherwise leaves rows in random order, so consecutive relationships touch unrelated node records and dirty a fresh page almost every row; sorting keeps Neo4j checkpoints short under a sustained write load. Grouping and batching are unchanged, so the deadlock-free guarantee is unaffected.
+* Opt-in `strategy="hash"` grouping strategy for `bipartite`, `monopartite`, and `predefined_components` `group_and_batch_spark_dataframe`/`create_node_groupings`, and for `build_relationship`. Computes group assignments entirely in Spark using `hash(id) % num_groups`, with no `collect()` to the driver and no join back against the source DataFrame. Scales to very large distinct-ID counts at the cost of not balancing group sizes; the default `strategy="greedy"` is unchanged.
 
 ## v0.5.2
 

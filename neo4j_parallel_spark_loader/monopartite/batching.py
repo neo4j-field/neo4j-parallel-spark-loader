@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
@@ -12,7 +12,9 @@ from pyspark.sql.functions import (
 )
 
 
-def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
+def create_ingest_batches_from_groups(
+    spark_dataframe: DataFrame, known_group_count: Optional[int] = None
+) -> DataFrame:
     """
     Create batches for ingest into Neo4j.
     Add a `batch` column to the Spark DataFrame identifying which batch the group in that row belongs to.
@@ -22,6 +24,12 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
     ----------
     spark_dataframe : DataFrame
         The Spark DataFrame to operate on.
+    known_group_count : Optional[int], optional
+        The total number of possible groups, if already known (e.g. `num_groups` when using
+        the "hash" grouping strategy). When provided, the `distinct().count()` pass over
+        `source_group`/`target_group` is skipped. Coloring a complete graph with this many
+        vertices remains deadlock-free even if some groups turn out to be empty. By default
+        None.
 
     Returns
     -------
@@ -31,17 +39,20 @@ def create_ingest_batches_from_groups(spark_dataframe: DataFrame) -> DataFrame:
 
     spark: SparkSession = spark_dataframe.sparkSession
 
-    group_count = (
-        spark_dataframe.select("source_group")
-        .withColumnRenamed("source_group", "group")
-        .union(
-            spark_dataframe.select("target_group").withColumnRenamed(
-                "target_group", "group"
+    if known_group_count is not None:
+        group_count = known_group_count
+    else:
+        group_count = (
+            spark_dataframe.select("source_group")
+            .withColumnRenamed("source_group", "group")
+            .union(
+                spark_dataframe.select("target_group").withColumnRenamed(
+                    "target_group", "group"
+                )
             )
+            .distinct()
+            .count()
         )
-        .distinct()
-        .count()
-    )
 
     coloring = color_complete_graph_with_self_loops(group_count)
 

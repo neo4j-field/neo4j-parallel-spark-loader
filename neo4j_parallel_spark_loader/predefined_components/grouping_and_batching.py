@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pyspark.sql import DataFrame
 
 from .batching import create_ingest_batches_from_groups
@@ -5,7 +7,10 @@ from .grouping import create_node_groupings
 
 
 def group_and_batch_spark_dataframe(
-    spark_dataframe: DataFrame, partition_col: str, num_groups: int
+    spark_dataframe: DataFrame,
+    partition_col: str,
+    num_groups: int,
+    strategy: Literal["greedy", "hash"] = "greedy",
 ) -> DataFrame:
     """
     Create node groupings and batches for parallel ingest into Neo4j.
@@ -21,6 +26,8 @@ def group_and_batch_spark_dataframe(
         The desired column to partition on.
     num_groups : int
         The desired number of groups to generate. The process may generate less groups as necessary.
+    strategy : Literal["greedy", "hash"], optional
+        The grouping strategy to use. See `create_node_groupings` for details. By default "greedy".
 
     Returns
     -------
@@ -32,5 +39,6 @@ def group_and_batch_spark_dataframe(
         spark_dataframe=spark_dataframe,
         partition_col=partition_col,
         num_groups=num_groups,
+        strategy=strategy,
     )
     return create_ingest_batches_from_groups(spark_dataframe=grouped_sdf)
