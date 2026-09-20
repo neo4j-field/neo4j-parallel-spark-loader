@@ -1,4 +1,4 @@
-## Next
+## v0.6.0 (2026-09-19)
 
 ### Fixed
 
@@ -16,6 +16,7 @@
 * `ingest_spark_dataframe` treats a `null` `group` the same as a `null` `batch`. In the predefined components scenario rows with a `null` partition value have `batch` 0 but a `null` group, and were previously written alongside real groups.
 * Monopartite `create_node_groupings` with `strategy="hash"` raises a `TypeError` when the source and target id columns have different data types. Spark's `hash()` depends on the type, so the same id would otherwise land in different groups and break the deadlock-free guarantee.
 * Bipartite and monopartite `create_ingest_batches_from_groups` functions accept an optional `known_group_count` parameter to skip a `distinct().count()` pass when the number of groups is already known (used by the "hash" grouping strategy).
+* Cap supported Python to `>=3.10,<3.14`. PySpark 3.5.4's cloudpickle-based closure serialization is not yet compatible with CPython 3.14.
 
 ### Added
 
