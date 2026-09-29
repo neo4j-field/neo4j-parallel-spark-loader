@@ -1,4 +1,4 @@
-from .utils import ingest_spark_dataframe
+from .utils import IngestPlan, ingest_spark_dataframe
 from .utils.build_relationship import build_relationship
 
 __all__ = [
@@ -7,4 +7,5 @@ __all__ = [
     "predefined_components",
     "build_relationship",
     "ingest_spark_dataframe",
+    "IngestPlan",
 ]

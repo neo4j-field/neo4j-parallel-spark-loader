@@ -67,6 +67,15 @@ Each grouping and batching scenario has its own module. The `group_and_batch_spa
 
 ### Ingesting very large DataFrames
 
+Pass `return_plan=True` to `group_and_batch_spark_dataframe()` to also get an `IngestPlan`, and hand it to `ingest_spark_dataframe()`. The plan lists the batches and groups and counts the rows that cannot be ingested, all worked out during grouping, so ingest skips its own pass over the DataFrame and applies `on_null_batch` before anything is written. With the default greedy strategy the plan comes free from grouping's counting pass; with the hash strategy it costs one counting pass. `build_relationship` does this for you.
+
+```
+batched_df, plan = group_and_batch_spark_dataframe(
+    df, "customer_id", "product_id", num_groups=10, return_plan=True
+)
+ingest_spark_dataframe(batched_df, "Overwrite", options, plan=plan)
+```
+
 Each batch is a filter over the grouped DataFrame, and Spark recomputes the input plan for every batch. For large inputs pass `checkpoint_path` to `ingest_spark_dataframe()`. The grouped DataFrame is then written once as Parquet partitioned by `batch`, and each batch reads only its own files:
 
 ```
@@ -168,6 +177,11 @@ The function uses the size of the DataFrame to decide whether to process in para
 It also decides which grouping methodology to use based on the number of `group_keys` that given.  Passing in a single key will result in a `predefined` grouping while passing 2 keys in will result in a `bipartite` grouping.  `monopartite` is not yet supported.
 
 The function assumes a `num_groups` of 10 for the grouping and ingestion calls.  This can also be overwritten by passing the desired value to `num_groups`
+
+Without materialization, `build_relationship` computes the input DataFrame once for grouping and once per batch. If the DataFrame is expensive to compute (joins, aggregations, `distinct`, UDFs) or not deterministic, pass `materialize` so it is computed exactly once:
+
+* `materialize="persist"` caches the DataFrame with `DataFrame.persist()` and releases it when the load finishes. Not available on Databricks serverless compute.
+* `materialize="s3://bucket/tmp/relationship-input/"` (any path) writes the DataFrame there once as Parquet and reads it back. Existing data at the path is overwritten; delete it once the load is complete.
 
 This function may be imported with `from neo4j_parallel_spark_loader import build_relationship`
 

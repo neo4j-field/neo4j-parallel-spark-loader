@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from pyspark.sql import DataFrame
 
@@ -26,6 +26,7 @@ def build_relationship(
     on_null_batch: Literal["raise", "skip"] = "raise",
     checkpoint_path: Optional[str] = None,
     sort_columns: Optional[List[str]] = None,
+    materialize: Union[None, Literal["persist"], str] = None,
 ) -> None:
     """Build a relationship between two nodes.
     Params:
@@ -50,12 +51,26 @@ def build_relationship(
         checkpoint_path: Optional[str], optional
             Passed to `ingest_spark_dataframe`. When set, the grouped DataFrame is written
             once as Parquet partitioned by batch and each batch is read back from there
-            instead of recomputing the input. Recommended for very large DataFrames.
+            instead of recomputing the input. The checkpoint can be used to resume a failed
+            load. To avoid recomputing the input at all, use `materialize` instead.
             By default None
         sort_columns: Optional[List[str]], optional
             Passed to `ingest_spark_dataframe`. Sorts each group's rows by these columns
             before writing, typically the source node id, to improve write locality on
             Neo4j. By default None
+        materialize: Union[None, Literal["persist"], str], optional
+            Materialize `df` before anything else runs, so its lineage is computed exactly
+            once instead of once for grouping and once per batch. Recommended when `df` is
+            expensive to compute (joins, aggregations, `distinct`, UDFs) or not
+            deterministic.
+            "persist" caches `df` with `DataFrame.persist()`: the grouping pass fills the
+            cache and every later pass reads it. The cache is released when this function
+            returns. Partitions lost with an executor are recomputed from the lineage.
+            Not available on Databricks serverless compute.
+            Any other string is a path: `df` is written there once as Parquet and read back.
+            Existing data at the path is overwritten, and the caller is responsible for
+            deleting it after the load. Column names must be valid Parquet column names.
+            By default None (no materialization)
     """
     options = {
         "relationship": relationship_name,
@@ -70,35 +85,64 @@ def build_relationship(
     if rel_props:
         options["relationship.properties"] = ",".join(rel_props)
 
-    row_count = df.count()
-    print(f"""Building {row_count} relationships""")
-    if group_keys and len(group_keys) > 0 and row_count > max_serial:
-        print("Building in parallel")
-        if len(group_keys) == 1:
-            print("Using Predefined Grouping")
-            batched_df = group_and_batch_predefined(
-                df, group_keys[0], num_groups, strategy=strategy
+    unpersist = None
+    if materialize == "persist":
+        print("Persisting input")
+        df = df.persist()
+        unpersist = df.unpersist
+    elif materialize is not None:
+        assert (
+            isinstance(materialize, str) and materialize
+        ), '`materialize` must be None, "persist", or a path'
+        print(f"Materializing input to {materialize}")
+        df.write.mode("overwrite").parquet(materialize)
+        df = df.sparkSession.read.parquet(materialize)
+
+    try:
+        if group_keys:
+            # grouping counts the rows and builds the ingest plan in the same pass, so neither
+            # this function nor ingest needs a pass of its own
+            if len(group_keys) == 1:
+                grouping_name = "Predefined"
+                batched_df, plan = group_and_batch_predefined(
+                    df, group_keys[0], num_groups, strategy=strategy, return_plan=True
+                )
+            else:
+                grouping_name = "Bipartite"
+                batched_df, plan = group_and_batch_bipartite(
+                    df,
+                    group_keys[0],
+                    group_keys[1],
+                    num_groups,
+                    strategy=strategy,
+                    return_plan=True,
+                )
+            row_count = plan.total_rows
+        else:
+            row_count = df.count()
+
+        print(f"""Building {row_count} relationships""")
+        if group_keys and row_count > max_serial:
+            print("Building in parallel")
+            print(f"Using {grouping_name} Grouping")
+            ingest_spark_dataframe(
+                spark_dataframe=batched_df,
+                save_mode="Overwrite",
+                options=options,
+                on_null_batch=on_null_batch,
+                checkpoint_path=checkpoint_path,
+                sort_columns=sort_columns,
+                plan=plan,
             )
         else:
-            print("Using Bipartite Grouping")
-            batched_df = group_and_batch_bipartite(
-                df, group_keys[0], group_keys[1], num_groups, strategy=strategy
+            print("Building in series")
+            df = (
+                df.coalesce(1)
+                .write.format("org.neo4j.spark.DataSource")
+                .mode("Overwrite")
+                .options(**options)
+                .save()
             )
-
-        ingest_spark_dataframe(
-            spark_dataframe=batched_df,
-            save_mode="Overwrite",
-            options=options,
-            on_null_batch=on_null_batch,
-            checkpoint_path=checkpoint_path,
-            sort_columns=sort_columns,
-        )
-    else:
-        print("Building in series")
-        df = (
-            df.coalesce(1)
-            .write.format("org.neo4j.spark.DataSource")
-            .mode("Overwrite")
-            .options(**options)
-            .save()
-        )
+    finally:
+        if unpersist is not None:
+            unpersist()

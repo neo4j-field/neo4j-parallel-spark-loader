@@ -4,7 +4,10 @@ from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, concat, greatest, least, lit, when
 
 from ..utils.grouping import (
-    create_value_groupings,
+    GroupingResult,
+    apply_key_groupings,
+    create_key_groupings,
+    value_key_column,
 )
 from ..utils.hash_grouping import hash_group_column
 from ..utils.verify_spark import verify_spark_version
@@ -35,8 +38,10 @@ def create_node_groupings(
         The desired number of groups to generate. The process may generate less groups as necessary.
     strategy : Literal["greedy", "hash"], optional
         The grouping strategy to use. By default "greedy".
-        "greedy" collects distinct id counts (combining source and target ids) to the driver
-        and greedily bin-packs them into balanced groups. This scales poorly with the number
+        "greedy" counts rows per distinct id (combining source and target ids), collects the
+        counts to the driver keyed by a 64-bit hash of the id, and greedily bin-packs them
+        into balanced groups. If `source_col` and `target_col` have different types, both are
+        cast to their common type before hashing so the same id gets the same group. This scales poorly with the number
         of distinct ids and can OOM the driver on very large datasets.
         "hash" assigns each row's `source_group`/`target_group` using `hash(id) % num_groups`
         entirely within Spark, with no driver collect and no join. The same expression is
@@ -54,6 +59,27 @@ def create_node_groupings(
         The Spark DataFrame with added columns `source_group`, `target_group` and `group`.
     """
 
+    return _create_node_groupings(
+        spark_dataframe=spark_dataframe,
+        source_col=source_col,
+        target_col=target_col,
+        num_groups=num_groups,
+        strategy=strategy,
+    ).dataframe
+
+
+def _create_node_groupings(
+    spark_dataframe: DataFrame,
+    source_col: str,
+    target_col: str,
+    num_groups: int,
+    strategy: Literal["greedy", "hash"] = "greedy",
+) -> GroupingResult:
+    """
+    `create_node_groupings`, also returning what grouping learned for batching and the ingest
+    plan. `group_counts` is `[group count]`, shared by source and target.
+    """
+
     verify_spark_version(spark_session=spark_dataframe.sparkSession)
 
     if strategy == "hash":
@@ -63,37 +89,49 @@ def create_node_groupings(
             "source_group", hash_group_column(source_col, num_groups)
         ).withColumn("target_group", hash_group_column(target_col, num_groups))
 
-        return _create_group_column(final_sdf)
+        return GroupingResult(
+            dataframe=_create_group_column(final_sdf), group_counts=[num_groups]
+        )
 
-    # stack source and target
-    # group by and count
-    counts_df = create_value_counts_dataframe(
-        spark_dataframe=spark_dataframe, source_col=source_col, target_col=target_col
+    # xxhash64 depends on the data type, so hash both columns as their common type
+    id_type = (
+        spark_dataframe.select(col(source_col).alias("id"))
+        .union(spark_dataframe.select(col(target_col).alias("id")))
+        .schema["id"]
+        .dataType
     )
+    source_key = value_key_column(col(source_col).cast(id_type))
+    target_key = value_key_column(col(target_col).cast(id_type))
 
-    keys_sdf = create_value_groupings(
-        value_counts_spark_dataframe=counts_df,
+    # pool source and target keys so a node id gets one group in either position
+    key_groupings = create_key_groupings(
+        spark_dataframe=spark_dataframe,
+        key_sets=[[source_key, target_key]],
         num_groups=num_groups,
-        grouping_column="combined_col",
+    )
+    [(mapping_sdf, group_count)] = key_groupings.mappings
+
+    final_sdf = apply_key_groupings(
+        spark_dataframe=spark_dataframe,
+        key_column=source_key,
+        mapping_sdf=mapping_sdf,
+        group_count=group_count,
+        output_column="source_group",
+    )
+    final_sdf = apply_key_groupings(
+        spark_dataframe=final_sdf,
+        key_column=target_key,
+        mapping_sdf=mapping_sdf,
+        group_count=group_count,
+        output_column="target_group",
     )
 
-    final_sdf = (
-        spark_dataframe.join(
-            other=keys_sdf.withColumnRenamed("group", "source_group"),
-            on=(spark_dataframe[source_col] == keys_sdf.value),
-            how="left",
-        )
-        .drop(keys_sdf.value)
-        .join(
-            other=keys_sdf.withColumnRenamed("group", "target_group"),
-            on=(spark_dataframe[target_col] == keys_sdf.value),
-            how="left",
-        )
-        .drop(keys_sdf.value)
-        .drop("value")
+    return GroupingResult(
+        dataframe=_create_group_column(final_sdf),
+        group_counts=[group_count],
+        total_rows=key_groupings.total_rows,
+        null_rows=key_groupings.null_rows,
     )
-
-    return _create_group_column(final_sdf)
 
 
 def _verify_matching_id_types(

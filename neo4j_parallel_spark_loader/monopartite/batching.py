@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import (
@@ -92,6 +92,28 @@ def create_ingest_batches_from_groups(
     result_df = result_df.drop(result_df.source_group, result_df.target_group)
 
     return result_df
+
+
+def plan_ingest_batches(group_count: int) -> Dict[int, List[str]]:
+    """
+    List the groups in each batch that `create_ingest_batches_from_groups` produces when group
+    values are drawn from `[0, group_count)` and `known_group_count` is `group_count`.
+    """
+
+    if group_count <= 0:
+        return {}
+
+    batches: Dict[int, set] = {}
+    for (low, high), batch in color_complete_graph_with_self_loops(group_count).items():
+        if group_count % 2 == 0 and low == high:
+            # mirrors the self-loop regrouping in `create_ingest_batches_from_groups`
+            pair = (low + group_count // 2) % group_count
+            group = f"self-loops {min(low, pair)} and {max(low, pair)}"
+        else:
+            group = f"{low} -- {high}"
+        batches.setdefault(batch, set()).add(group)
+
+    return {batch: sorted(groups) for batch, groups in batches.items()}
 
 
 def color_complete_graph_with_self_loops(n: int) -> Dict[Tuple[int], int]:

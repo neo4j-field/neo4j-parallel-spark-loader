@@ -6,6 +6,8 @@ from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import col, count, create_map, hash, lit, pmod
 from pyspark.sql.functions import min as spark_min
 
+from .ingest_plan import IngestPlan
+
 logger = logging.getLogger(__name__)
 
 _GROUP_KEY_COLUMN = "__neo4j_parallel_group_key"
@@ -19,6 +21,7 @@ def ingest_spark_dataframe(
     on_null_batch: Literal["raise", "skip"] = "raise",
     checkpoint_path: Optional[str] = None,
     sort_columns: Optional[List[str]] = None,
+    plan: Optional[IngestPlan] = None,
 ) -> None:
     """
     Saves a Spark DataFrame in multiple batches based on the 'batch' column values.
@@ -71,6 +74,14 @@ def ingest_spark_dataframe(
         fewer pages, checkpoints have less to flush, and commits contend less with checkpoint
         IO. The sort is local to each partition and does not change which rows are in which
         group or batch, so the deadlock-free guarantee is unaffected. By default None (no sort)
+    plan : Optional[IngestPlan], optional
+        The batches, groups and row counts of `spark_dataframe`, as returned by
+        `group_and_batch_spark_dataframe(..., return_plan=True)`. Without a plan, ingest runs
+        a pass over the DataFrame to find the `(batch, group)` pairs and count the rows with a
+        `null` `batch` or `group`. With a plan that pass is skipped, and `on_null_batch` is
+        applied before anything is written, including the checkpoint. The plan must describe
+        this DataFrame: rows in a batch the plan does not list are not written. By default
+        None
 
     Example
     -------
@@ -119,6 +130,16 @@ def ingest_spark_dataframe(
 
     spark: SparkSession = spark_dataframe.sparkSession
 
+    # batch value -> group value -> row count, or None when the plan does not know it
+    schedule: Dict[Any, Dict[Any, Optional[int]]] = {}
+
+    if plan is not None:
+        # grouping already knows everything the schedule pass would find
+        _check_null_rows(plan.null_rows or 0, on_null_batch)
+        for batch_value, groups in plan.batches.items():
+            if groups:
+                schedule[batch_value] = {group: None for group in groups}
+
     if checkpoint_path is not None:
         logger.info("Writing checkpoint partitioned by batch to %s", checkpoint_path)
         spark_dataframe.write.mode("overwrite").partitionBy("batch").parquet(
@@ -127,34 +148,24 @@ def ingest_spark_dataframe(
         spark_dataframe = spark.read.parquet(checkpoint_path)
         logger.info("Checkpoint written")
 
-    # One pass collects everything the driver needs: the distinct (batch, group) pairs with
-    # their row counts, and the number of rows that could not be assigned to a batch or group.
-    # Only this small schedule is collected, never the relationship rows themselves.
-    schedule_rows = (
-        spark_dataframe.groupBy("batch", "group")
-        .agg(count(lit(1)).alias("rows"))
-        .collect()
-    )
-
-    null_row_count = 0
-    schedule: Dict[Any, Dict[Any, int]] = {}
-    for row in schedule_rows:
-        if row["batch"] is None or row["group"] is None:
-            null_row_count += row["rows"]
-        else:
-            schedule.setdefault(row["batch"], {})[row["group"]] = row["rows"]
-
-    if null_row_count > 0:
-        message = (
-            f"{null_row_count} row(s) have a null `batch` or `group` and cannot be ingested. "
-            "This happens when a node id column (or the partition column for predefined "
-            "components) is null, so the row was never assigned to a group. Filter or "
-            "repair these rows before grouping, or pass `on_null_batch='skip'` to ingest "
-            "the remaining rows and drop these."
+    if plan is None:
+        # One pass collects everything the driver needs: the distinct (batch, group) pairs
+        # with their row counts, and the number of rows that could not be assigned to a batch
+        # or group. Only this small schedule is collected, never the relationship rows.
+        schedule_rows = (
+            spark_dataframe.groupBy("batch", "group")
+            .agg(count(lit(1)).alias("rows"))
+            .collect()
         )
-        if on_null_batch == "raise":
-            raise ValueError(message)
-        warnings.warn(message)
+
+        null_row_count = 0
+        for row in schedule_rows:
+            if row["batch"] is None or row["group"] is None:
+                null_row_count += row["rows"]
+            else:
+                schedule.setdefault(row["batch"], {})[row["group"]] = row["rows"]
+
+        _check_null_rows(null_row_count, on_null_batch)
 
     group_type = spark_dataframe.schema["group"].dataType
     keys_by_count: Dict[int, List[int]] = {}
@@ -164,7 +175,8 @@ def ingest_spark_dataframe(
     for position, batch_value in enumerate(sorted(schedule), start=1):
         groups = sorted(schedule[batch_value])
         partition_count = len(groups)
-        batch_rows = sum(schedule[batch_value].values())
+        group_rows = schedule[batch_value].values()
+        batch_rows = None if None in group_rows else sum(group_rows)
 
         if partition_count not in keys_by_count:
             keys_by_count[partition_count] = _partition_keys(spark, partition_count)
@@ -180,12 +192,12 @@ def ingest_spark_dataframe(
         )
 
         logger.info(
-            "Ingesting batch %s (%d/%d): %d groups in parallel, %d rows",
+            "Ingesting batch %s (%d/%d): %d groups in parallel%s",
             batch_value,
             position,
             total_batches,
             partition_count,
-            batch_rows,
+            "" if batch_rows is None else f", {batch_rows} rows",
         )
 
         batch_df = (
@@ -208,6 +220,24 @@ def ingest_spark_dataframe(
         )
 
         logger.info("Finished batch %s (%d/%d)", batch_value, position, total_batches)
+
+
+def _check_null_rows(
+    null_row_count: int, on_null_batch: Literal["raise", "skip"]
+) -> None:
+    """Raise or warn, according to `on_null_batch`, when some rows cannot be ingested."""
+
+    if null_row_count > 0:
+        message = (
+            f"{null_row_count} row(s) have a null `batch` or `group` and cannot be ingested. "
+            "This happens when a node id column (or the partition column for predefined "
+            "components) is null, so the row was never assigned to a group. Filter or "
+            "repair these rows before grouping, or pass `on_null_batch='skip'` to ingest "
+            "the remaining rows and drop these."
+        )
+        if on_null_batch == "raise":
+            raise ValueError(message)
+        warnings.warn(message)
 
 
 def _partition_keys(spark: SparkSession, partition_count: int) -> List[int]:

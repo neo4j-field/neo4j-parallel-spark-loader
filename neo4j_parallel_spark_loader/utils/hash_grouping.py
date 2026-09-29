@@ -17,10 +17,9 @@ def hash_group_column(column_name: str, num_groups: int) -> Column:
     Note
     ----
     Spark's `hash()` function returns a constant, non-null value for `null` input. To keep this
-    consistent with the greedy strategy -- where a `null` node ID does not match any row in the
-    grouping map produced by `create_value_groupings` and is therefore left with a `null` group
-    after the left join -- `null` values in `column_name` are explicitly mapped to a `null` group
-    here as well.
+    consistent with the greedy strategy -- where `value_key_column` gives a `null` node ID a
+    `null` key and `apply_key_groupings` therefore leaves it with a `null` group -- `null` values
+    in `column_name` are explicitly mapped to a `null` group here as well.
 
     Parameters
     ----------
