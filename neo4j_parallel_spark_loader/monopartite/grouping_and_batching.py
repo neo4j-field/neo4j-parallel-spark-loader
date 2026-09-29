@@ -3,7 +3,7 @@ from typing import Literal
 from pyspark.sql import DataFrame
 
 from .batching import create_ingest_batches_from_groups
-from .grouping import create_node_groupings
+from .grouping import create_node_groupings_with_group_count
 
 
 def group_and_batch_spark_dataframe(
@@ -38,14 +38,13 @@ def group_and_batch_spark_dataframe(
         The Spark DataFrame with added columns `group` and `batch`.
     """
 
-    grouped_sdf = create_node_groupings(
+    grouped_sdf, group_count = create_node_groupings_with_group_count(
         spark_dataframe=spark_dataframe,
         source_col=source_col,
         target_col=target_col,
         num_groups=num_groups,
         strategy=strategy,
     )
-    known_group_count = num_groups if strategy == "hash" else None
     return create_ingest_batches_from_groups(
-        spark_dataframe=grouped_sdf, known_group_count=known_group_count
+        spark_dataframe=grouped_sdf, known_group_count=group_count
     )

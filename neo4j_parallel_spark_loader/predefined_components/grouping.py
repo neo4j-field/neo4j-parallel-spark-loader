@@ -2,7 +2,11 @@ from typing import Literal
 
 from pyspark.sql import DataFrame
 
-from ..utils.grouping import create_value_counts_dataframe, create_value_groupings
+from ..utils.grouping import (
+    apply_key_groupings,
+    create_key_groupings,
+    value_key_column,
+)
 from ..utils.hash_grouping import hash_group_column
 from ..utils.verify_spark import verify_spark_version
 
@@ -27,9 +31,10 @@ def create_node_groupings(
         The desired number of groups to generate. The process may generate less groups as necessary.
     strategy : Literal["greedy", "hash"], optional
         The grouping strategy to use. By default "greedy".
-        "greedy" collects distinct `partition_col` value counts to the driver and greedily
-        bin-packs them into balanced groups. This scales poorly with the number of distinct
-        values and can OOM the driver on very large datasets.
+        "greedy" counts rows per distinct `partition_col` value, collects the counts to the
+        driver keyed by a 64-bit hash of the value, and greedily bin-packs them into balanced
+        groups. This scales poorly with the number of distinct values and can OOM the driver
+        on very large datasets.
         "hash" assigns each row's `group` using `hash(partition_col) % num_groups` entirely
         within Spark, with no driver collect and no join. It scales to very large datasets
         but does not balance group sizes, so a small number of extremely large components
@@ -49,27 +54,17 @@ def create_node_groupings(
             "group", hash_group_column(partition_col, num_groups)
         )
 
-    # to create buckets
-    # run over partition_col
-    # group by and count
-    value_counts_sdf = create_value_counts_dataframe(
-        spark_dataframe=spark_dataframe, grouping_column=partition_col
-    )
-    # iterate through the values in max -> min order ex: [{key: Amazon, value_count: 100000}, ...]
-    # find most-empty bucket (num_groups) and place value in it and increment bucket value by value_count
-    # # track with 2 separate hash maps
-    value_groupings_sdf = create_value_groupings(
-        value_counts_spark_dataframe=value_counts_sdf,
-        num_groups=num_groups,
-        grouping_column=partition_col,
+    # count rows per partition value key, bin-pack the keys into balanced groups on the
+    # driver, then join the groups back on the key
+    key = value_key_column(partition_col)
+    mapping_sdf, group_count = create_key_groupings(
+        spark_dataframe=spark_dataframe, key_columns=[key], num_groups=num_groups
     )
 
-    final_sdf = spark_dataframe.join(
-        other=value_groupings_sdf,
-        on=(spark_dataframe[partition_col] == value_groupings_sdf.value),
-        how="left",
-    ).drop(value_groupings_sdf.value)
-
-    final_sdf = final_sdf.drop("value")
-
-    return final_sdf
+    return apply_key_groupings(
+        spark_dataframe=spark_dataframe,
+        key_column=key,
+        mapping_sdf=mapping_sdf,
+        group_count=group_count,
+        output_column="group",
+    )

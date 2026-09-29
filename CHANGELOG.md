@@ -1,3 +1,15 @@
+## Unreleased
+
+### Fixed
+
+* Greedy grouping no longer leaves rows with a `null` group when their node id or partition value is not `null`. It used to collect the raw values to the driver and join the resulting groups back by value, so a value that did not survive the round trip unchanged matched nothing. That happened to strings containing invalid UTF-8, which Python decodes with replacement characters, and to any value produced by a non-deterministic input whose re-evaluation differed from the counting pass. `ingest_spark_dataframe` then rejected those rows with "row(s) have a null `batch` or `group`". Greedy grouping now counts and joins on `xxhash64` of the value computed inside Spark, so values never leave the JVM, and only `(key, count)` longs are collected to the driver. A non-null key missing from the mapping gets the fallback group `pmod(key, group_count)`, so every row sharing a value still lands in the same group. Hash collisions only put extra values in the same group, which cannot break the deadlock-free guarantee.
+* Bipartite and monopartite greedy `group_and_batch_spark_dataframe` pass the number of groups used by the grouping step to batching, instead of running `distinct().count()` passes over `source_group`/`target_group`. This removes two (bipartite) or one (monopartite) evaluations of the input, and keeps the batch schedule valid even if a non-deterministic input leaves some groups empty.
+
+### Changed
+
+* Monopartite greedy grouping hashes the source and target ids as their common type, so the same id in an `int` column and a `long` column gets the same group, as the previous value join did.
+* Removed the internal `create_value_groupings` helper from `neo4j_parallel_spark_loader.utils.grouping`, replaced by `create_key_groupings` and `apply_key_groupings`.
+
 ## v0.6.0 (2026-09-19)
 
 ### Fixed
