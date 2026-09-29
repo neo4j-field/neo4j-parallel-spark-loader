@@ -2,6 +2,7 @@
 
 ### Added
 
+* `build_relationship` accepts `materialize`. `"persist"` caches the input with `DataFrame.persist()` for the duration of the load; any other string is a path the input is written to once as Parquet and read back from. Either way the input's lineage is computed exactly once, instead of once for grouping and once per batch.
 * `IngestPlan`, exported from the package root. `group_and_batch_spark_dataframe(..., return_plan=True)` in every scenario returns `(DataFrame, IngestPlan)`, and `ingest_spark_dataframe(..., plan=plan)` uses it to skip its pass over the DataFrame that finds the `(batch, group)` pairs and counts rows with a `null` batch or group. With a plan, `on_null_batch="raise"` fails before anything is written, including the checkpoint.
 
 ### Fixed

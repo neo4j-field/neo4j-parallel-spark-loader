@@ -178,6 +178,11 @@ It also decides which grouping methodology to use based on the number of `group_
 
 The function assumes a `num_groups` of 10 for the grouping and ingestion calls.  This can also be overwritten by passing the desired value to `num_groups`
 
+Without materialization, `build_relationship` computes the input DataFrame once for grouping and once per batch. If the DataFrame is expensive to compute (joins, aggregations, `distinct`, UDFs) or not deterministic, pass `materialize` so it is computed exactly once:
+
+* `materialize="persist"` caches the DataFrame with `DataFrame.persist()` and releases it when the load finishes. Not available on Databricks serverless compute.
+* `materialize="s3://bucket/tmp/relationship-input/"` (any path) writes the DataFrame there once as Parquet and reads it back. Existing data at the path is overwritten; delete it once the load is complete.
+
 This function may be imported with `from neo4j_parallel_spark_loader import build_relationship`
 
 Example Code Snippet
