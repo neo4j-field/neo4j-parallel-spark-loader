@@ -2,6 +2,18 @@ Neo4j-*.txt
 .DS_Store
 benchmarking/data/*.csv
 data/datasets/
+
+# Local-only: throwaway load-test infra, never pushed to the remote
+infra/databricks-loadtest/
+
+# Terraform, in case other infra gets added later
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfvars
+**/*.tfplan
+crash.log
+crash.*.log
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
