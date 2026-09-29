@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, List, Optional
 
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col
@@ -44,3 +44,22 @@ def create_ingest_batches_from_groups(
     ).drop(spark_dataframe.source_group, spark_dataframe.target_group)
 
     return spark_dataframe
+
+
+def plan_ingest_batches(
+    source_group_count: int, target_group_count: int
+) -> Dict[int, List[str]]:
+    """
+    List the groups in each batch that `create_ingest_batches_from_groups` produces when
+    `source_group` values are drawn from `[0, source_group_count)`, `target_group` values from
+    `[0, target_group_count)`, and `known_group_count` is the larger of the two.
+    """
+
+    num_colors = max(source_group_count, target_group_count)
+    batches: Dict[int, List[str]] = {}
+    for source_group in range(source_group_count):
+        for target_group in range(target_group_count):
+            batch = (source_group + target_group) % num_colors
+            batches.setdefault(batch, []).append(f"{source_group} --> {target_group}")
+
+    return batches

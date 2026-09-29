@@ -67,6 +67,15 @@ Each grouping and batching scenario has its own module. The `group_and_batch_spa
 
 ### Ingesting very large DataFrames
 
+Pass `return_plan=True` to `group_and_batch_spark_dataframe()` to also get an `IngestPlan`, and hand it to `ingest_spark_dataframe()`. The plan lists the batches and groups and counts the rows that cannot be ingested, all worked out during grouping, so ingest skips its own pass over the DataFrame and applies `on_null_batch` before anything is written. With the default greedy strategy the plan comes free from grouping's counting pass; with the hash strategy it costs one counting pass. `build_relationship` does this for you.
+
+```
+batched_df, plan = group_and_batch_spark_dataframe(
+    df, "customer_id", "product_id", num_groups=10, return_plan=True
+)
+ingest_spark_dataframe(batched_df, "Overwrite", options, plan=plan)
+```
+
 Each batch is a filter over the grouped DataFrame, and Spark recomputes the input plan for every batch. For large inputs pass `checkpoint_path` to `ingest_spark_dataframe()`. The grouped DataFrame is then written once as Parquet partitioned by `batch`, and each batch reads only its own files:
 
 ```

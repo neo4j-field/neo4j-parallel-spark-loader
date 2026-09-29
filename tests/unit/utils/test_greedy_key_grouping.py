@@ -5,6 +5,7 @@ from pyspark.sql.types import LongType
 from neo4j_parallel_spark_loader.utils.grouping import (
     _greedy_bin_pack,
     apply_key_groupings,
+    count_rows_and_null_keys,
     create_key_groupings,
     value_key_column,
 )
@@ -53,12 +54,13 @@ def test_create_key_groupings_counts_keys_from_all_columns(
 ) -> None:
     sdf = spark_fixture.createDataFrame([(1, 2), (1, 3), (2, 1)], "s long, t long")
 
-    mapping_sdf, group_count = create_key_groupings(
+    key_groupings = create_key_groupings(
         spark_dataframe=sdf,
-        key_columns=[value_key_column("s"), value_key_column("t")],
+        key_sets=[[value_key_column("s"), value_key_column("t")]],
         num_groups=4,
     )
 
+    [(mapping_sdf, group_count)] = key_groupings.mappings
     assert mapping_sdf.count() == 3
     assert group_count == 3
 
@@ -70,9 +72,9 @@ def test_invalid_utf8_values_get_a_group(spark_fixture: SparkSession) -> None:
         ).alias("value")
     )
     key = value_key_column("value")
-    mapping_sdf, group_count = create_key_groupings(
-        spark_dataframe=sdf, key_columns=[key], num_groups=4
-    )
+    [(mapping_sdf, group_count)] = create_key_groupings(
+        spark_dataframe=sdf, key_sets=[[key]], num_groups=4
+    ).mappings
 
     result = apply_key_groupings(
         spark_dataframe=sdf,
@@ -94,9 +96,9 @@ def test_colliding_keys_share_a_group(spark_fixture: SparkSession) -> None:
     key = when(col("value").isNull(), lit(None).cast(LongType())).otherwise(
         lit(7).cast(LongType())
     )
-    mapping_sdf, group_count = create_key_groupings(
-        spark_dataframe=sdf, key_columns=[key], num_groups=4
-    )
+    [(mapping_sdf, group_count)] = create_key_groupings(
+        spark_dataframe=sdf, key_sets=[[key]], num_groups=4
+    ).mappings
 
     result = apply_key_groupings(
         spark_dataframe=sdf,
@@ -119,9 +121,9 @@ def test_unmatched_keys_fall_back_within_group_count(
         [("a",), ("a",), ("b",), ("c",)], "value string"
     )
     key = value_key_column("value")
-    mapping_sdf, group_count = create_key_groupings(
-        spark_dataframe=counted_sdf, key_columns=[key], num_groups=10
-    )
+    [(mapping_sdf, group_count)] = create_key_groupings(
+        spark_dataframe=counted_sdf, key_sets=[[key]], num_groups=10
+    ).mappings
     # values the counting pass never saw, as a non-deterministic input would produce
     unseen_sdf = spark_fixture.range(200).select(
         expr("concat('unseen-', cast(id % 50 AS STRING))").alias("value")
@@ -140,3 +142,78 @@ def test_unmatched_keys_fall_back_within_group_count(
     assert result.filter((col("group") < 0) | (col("group") >= 3)).count() == 0
     # each value still lands in exactly one group
     assert result.select("value", "group").distinct().count() == 50
+
+
+def test_create_key_groupings_bins_key_sets_independently(
+    spark_fixture: SparkSession,
+) -> None:
+    sdf = spark_fixture.createDataFrame(
+        [(1, 10), (1, 11), (2, 10), (3, 12)], "s long, t long"
+    )
+
+    key_groupings = create_key_groupings(
+        spark_dataframe=sdf,
+        key_sets=[[value_key_column("s")], [value_key_column("t")]],
+        num_groups=2,
+    )
+
+    [(source_mapping, source_count), (target_mapping, target_count)] = (
+        key_groupings.mappings
+    )
+    assert source_mapping.count() == 3
+    assert target_mapping.count() == 3
+    assert source_count == target_count == 2
+
+
+def test_create_key_groupings_counts_total_and_null_rows(
+    spark_fixture: SparkSession,
+) -> None:
+    sdf = spark_fixture.createDataFrame(
+        [(1, 10), (None, 11), (2, None), (None, None), (3, 12)], "s long, t long"
+    )
+
+    key_groupings = create_key_groupings(
+        spark_dataframe=sdf,
+        key_sets=[[value_key_column("s")], [value_key_column("t")]],
+        num_groups=2,
+    )
+
+    assert key_groupings.total_rows == 5
+    # a row is counted once even when both keys are null
+    assert key_groupings.null_rows == 3
+
+
+def test_create_key_groupings_counts_rows_once_when_pooled(
+    spark_fixture: SparkSession,
+) -> None:
+    sdf = spark_fixture.createDataFrame([(1, 2), (2, None), (3, 3)], "s long, t long")
+
+    key_groupings = create_key_groupings(
+        spark_dataframe=sdf,
+        key_sets=[[value_key_column("s"), value_key_column("t")]],
+        num_groups=2,
+    )
+
+    assert key_groupings.total_rows == 3
+    assert key_groupings.null_rows == 1
+
+
+def test_create_key_groupings_empty_dataframe(spark_fixture: SparkSession) -> None:
+    sdf = spark_fixture.createDataFrame([], "s long")
+
+    key_groupings = create_key_groupings(
+        spark_dataframe=sdf, key_sets=[[value_key_column("s")]], num_groups=2
+    )
+
+    assert key_groupings.total_rows == 0
+    assert key_groupings.null_rows == 0
+    assert key_groupings.mappings[0][1] == 0
+
+
+def test_count_rows_and_null_keys(spark_fixture: SparkSession) -> None:
+    sdf = spark_fixture.createDataFrame(
+        [(1, 10), (None, 11), (2, None), (None, None)], "s long, t long"
+    )
+
+    assert count_rows_and_null_keys(sdf, ["s", "t"]) == (4, 3)
+    assert count_rows_and_null_keys(sdf.limit(0), ["s", "t"]) == (0, 0)

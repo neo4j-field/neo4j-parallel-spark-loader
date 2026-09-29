@@ -70,21 +70,32 @@ def build_relationship(
     if rel_props:
         options["relationship.properties"] = ",".join(rel_props)
 
-    row_count = df.count()
-    print(f"""Building {row_count} relationships""")
-    if group_keys and len(group_keys) > 0 and row_count > max_serial:
-        print("Building in parallel")
+    if group_keys:
+        # grouping counts the rows and builds the ingest plan in the same pass, so neither
+        # this function nor ingest needs a pass of its own
         if len(group_keys) == 1:
-            print("Using Predefined Grouping")
-            batched_df = group_and_batch_predefined(
-                df, group_keys[0], num_groups, strategy=strategy
+            grouping_name = "Predefined"
+            batched_df, plan = group_and_batch_predefined(
+                df, group_keys[0], num_groups, strategy=strategy, return_plan=True
             )
         else:
-            print("Using Bipartite Grouping")
-            batched_df = group_and_batch_bipartite(
-                df, group_keys[0], group_keys[1], num_groups, strategy=strategy
+            grouping_name = "Bipartite"
+            batched_df, plan = group_and_batch_bipartite(
+                df,
+                group_keys[0],
+                group_keys[1],
+                num_groups,
+                strategy=strategy,
+                return_plan=True,
             )
+        row_count = plan.total_rows
+    else:
+        row_count = df.count()
 
+    print(f"""Building {row_count} relationships""")
+    if group_keys and row_count > max_serial:
+        print("Building in parallel")
+        print(f"Using {grouping_name} Grouping")
         ingest_spark_dataframe(
             spark_dataframe=batched_df,
             save_mode="Overwrite",
@@ -92,6 +103,7 @@ def build_relationship(
             on_null_batch=on_null_batch,
             checkpoint_path=checkpoint_path,
             sort_columns=sort_columns,
+            plan=plan,
         )
     else:
         print("Building in series")

@@ -1,8 +1,9 @@
-from typing import Literal, Tuple
+from typing import Literal
 
 from pyspark.sql import DataFrame
 
 from ..utils.grouping import (
+    GroupingResult,
     apply_key_groupings,
     create_group_column_from_source_and_target_groups,
     create_key_groupings,
@@ -53,28 +54,25 @@ def create_node_groupings(
         The Spark DataFrame with added columns `source_group`, `target_group` and `group`.
     """
 
-    grouped_sdf, _ = create_node_groupings_with_group_count(
+    return _create_node_groupings(
         spark_dataframe=spark_dataframe,
         source_col=source_col,
         target_col=target_col,
         num_groups=num_groups,
         strategy=strategy,
-    )
-
-    return grouped_sdf
+    ).dataframe
 
 
-def create_node_groupings_with_group_count(
+def _create_node_groupings(
     spark_dataframe: DataFrame,
     source_col: str,
     target_col: str,
     num_groups: int,
     strategy: Literal["greedy", "hash"] = "greedy",
-) -> Tuple[DataFrame, int]:
+) -> GroupingResult:
     """
-    Same as `create_node_groupings`, but also return the number of groups that `source_group`
-    and `target_group` values are drawn from, so batching does not have to count them.
-    Every non-null group value is in the range `[0, group_count)`.
+    `create_node_groupings`, also returning what grouping learned for batching and the ingest
+    plan. `group_counts` is `[source group count, target group count]`.
     """
 
     verify_spark_version(spark_session=spark_dataframe.sparkSession)
@@ -84,18 +82,24 @@ def create_node_groupings_with_group_count(
             "source_group", hash_group_column(source_col, num_groups)
         ).withColumn("target_group", hash_group_column(target_col, num_groups))
 
-        return create_group_column_from_source_and_target_groups(final_sdf), num_groups
+        return GroupingResult(
+            dataframe=create_group_column_from_source_and_target_groups(final_sdf),
+            group_counts=[num_groups, num_groups],
+        )
 
     # bin-pack source and target keys INDEPENDENTLY, since a bipartite source id and target
     # id never refer to the same node
     source_key = value_key_column(source_col)
     target_key = value_key_column(target_col)
-    source_mapping_sdf, source_group_count = create_key_groupings(
-        spark_dataframe=spark_dataframe, key_columns=[source_key], num_groups=num_groups
+    key_groupings = create_key_groupings(
+        spark_dataframe=spark_dataframe,
+        key_sets=[[source_key], [target_key]],
+        num_groups=num_groups,
     )
-    target_mapping_sdf, target_group_count = create_key_groupings(
-        spark_dataframe=spark_dataframe, key_columns=[target_key], num_groups=num_groups
-    )
+    [
+        (source_mapping_sdf, source_group_count),
+        (target_mapping_sdf, target_group_count),
+    ] = key_groupings.mappings
 
     final_sdf = apply_key_groupings(
         spark_dataframe=spark_dataframe,
@@ -112,6 +116,9 @@ def create_node_groupings_with_group_count(
         output_column="target_group",
     )
 
-    final_sdf = create_group_column_from_source_and_target_groups(final_sdf)
-
-    return final_sdf, max(source_group_count, target_group_count, 1)
+    return GroupingResult(
+        dataframe=create_group_column_from_source_and_target_groups(final_sdf),
+        group_counts=[source_group_count, target_group_count],
+        total_rows=key_groupings.total_rows,
+        null_rows=key_groupings.null_rows,
+    )

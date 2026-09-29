@@ -2,6 +2,9 @@ from pyspark.sql import DataFrame, DataFrameWriter, SparkSession
 from pytest_mock import MockerFixture
 
 from neo4j_parallel_spark_loader.utils.build_relationship import build_relationship
+from neo4j_parallel_spark_loader.utils.ingest_plan import IngestPlan
+
+PLAN = IngestPlan(batches={0: [0]}, total_rows=3, null_rows=0)
 
 
 def _small_dataframe(spark_fixture: SparkSession) -> DataFrame:
@@ -18,7 +21,8 @@ def test_build_relationship_options_include_rel_props_when_provided(
         "neo4j_parallel_spark_loader.utils.build_relationship.ingest_spark_dataframe"
     )
     mocker.patch(
-        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined"
+        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined",
+        return_value=(mocker.MagicMock(name="grouped_df"), PLAN),
     )
 
     build_relationship(
@@ -45,7 +49,8 @@ def test_build_relationship_options_omit_rel_props_when_not_provided(
         "neo4j_parallel_spark_loader.utils.build_relationship.ingest_spark_dataframe"
     )
     mocker.patch(
-        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined"
+        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined",
+        return_value=(mocker.MagicMock(name="grouped_df"), PLAN),
     )
 
     build_relationship(
@@ -80,7 +85,7 @@ def test_build_relationship_uses_predefined_grouping_for_single_group_key(
     grouped = mocker.MagicMock(name="grouped_df")
     mock_predefined = mocker.patch(
         "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined",
-        return_value=grouped,
+        return_value=(grouped, PLAN),
     )
     mock_bipartite = mocker.patch(
         "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_bipartite"
@@ -102,9 +107,12 @@ def test_build_relationship_uses_predefined_grouping_for_single_group_key(
         strategy="hash",
     )
 
-    mock_predefined.assert_called_once_with(df, "component", 3, strategy="hash")
+    mock_predefined.assert_called_once_with(
+        df, "component", 3, strategy="hash", return_plan=True
+    )
     mock_bipartite.assert_not_called()
     assert mock_ingest.call_args.kwargs["spark_dataframe"] is grouped
+    assert mock_ingest.call_args.kwargs["plan"] is PLAN
 
 
 def test_build_relationship_uses_bipartite_grouping_for_two_group_keys(
@@ -117,7 +125,7 @@ def test_build_relationship_uses_bipartite_grouping_for_two_group_keys(
     )
     mock_bipartite = mocker.patch(
         "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_bipartite",
-        return_value=grouped,
+        return_value=(grouped, PLAN),
     )
     mock_ingest = mocker.patch(
         "neo4j_parallel_spark_loader.utils.build_relationship.ingest_spark_dataframe"
@@ -136,9 +144,12 @@ def test_build_relationship_uses_bipartite_grouping_for_two_group_keys(
         strategy="hash",
     )
 
-    mock_bipartite.assert_called_once_with(df, "source", "target", 5, strategy="hash")
+    mock_bipartite.assert_called_once_with(
+        df, "source", "target", 5, strategy="hash", return_plan=True
+    )
     mock_predefined.assert_not_called()
     assert mock_ingest.call_args.kwargs["spark_dataframe"] is grouped
+    assert mock_ingest.call_args.kwargs["plan"] is PLAN
 
 
 def test_build_relationship_threads_optional_parameters_to_ingest(
@@ -146,7 +157,8 @@ def test_build_relationship_threads_optional_parameters_to_ingest(
 ) -> None:
     df = _small_dataframe(spark_fixture)
     mocker.patch(
-        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined"
+        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined",
+        return_value=(mocker.MagicMock(name="grouped_df"), PLAN),
     )
     mock_ingest = mocker.patch(
         "neo4j_parallel_spark_loader.utils.build_relationship.ingest_spark_dataframe"
@@ -177,9 +189,11 @@ def test_build_relationship_serial_path_when_row_count_at_or_below_max_serial(
     spark_fixture: SparkSession, mocker: MockerFixture
 ) -> None:
     df = _small_dataframe(spark_fixture)  # 3 rows
-    mock_predefined = mocker.patch(
-        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined"
+    mocker.patch(
+        "neo4j_parallel_spark_loader.utils.build_relationship.group_and_batch_predefined",
+        return_value=(mocker.MagicMock(name="grouped_df"), PLAN),
     )
+    mock_count = mocker.patch.object(DataFrame, "count")
     mock_ingest = mocker.patch(
         "neo4j_parallel_spark_loader.utils.build_relationship.ingest_spark_dataframe"
     )
@@ -196,7 +210,8 @@ def test_build_relationship_serial_path_when_row_count_at_or_below_max_serial(
         max_serial=3,
     )
 
-    mock_predefined.assert_not_called()
+    # the row count comes from the grouping plan, not a separate count
+    mock_count.assert_not_called()
     mock_ingest.assert_not_called()
     mock_save.assert_called_once()
 

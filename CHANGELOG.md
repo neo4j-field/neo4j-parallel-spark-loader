@@ -1,5 +1,9 @@
 ## Unreleased
 
+### Added
+
+* `IngestPlan`, exported from the package root. `group_and_batch_spark_dataframe(..., return_plan=True)` in every scenario returns `(DataFrame, IngestPlan)`, and `ingest_spark_dataframe(..., plan=plan)` uses it to skip its pass over the DataFrame that finds the `(batch, group)` pairs and counts rows with a `null` batch or group. With a plan, `on_null_batch="raise"` fails before anything is written, including the checkpoint.
+
 ### Fixed
 
 * Greedy grouping no longer leaves rows with a `null` group when their node id or partition value is not `null`. It used to collect the raw values to the driver and join the resulting groups back by value, so a value that did not survive the round trip unchanged matched nothing. That happened to strings containing invalid UTF-8, which Python decodes with replacement characters, and to any value produced by a non-deterministic input whose re-evaluation differed from the counting pass. `ingest_spark_dataframe` then rejected those rows with "row(s) have a null `batch` or `group`". Greedy grouping now counts and joins on `xxhash64` of the value computed inside Spark, so values never leave the JVM, and only `(key, count)` longs are collected to the driver. A non-null key missing from the mapping gets the fallback group `pmod(key, group_count)`, so every row sharing a value still lands in the same group. Hash collisions only put extra values in the same group, which cannot break the deadlock-free guarantee.
@@ -7,7 +11,9 @@
 
 ### Changed
 
+* `build_relationship` evaluates the input once for grouping and once per batch, and nothing else. Grouping now builds an `IngestPlan` (the batches, the groups in each, and the total and `null` row counts) from its counting pass, and `build_relationship` passes it to `ingest_spark_dataframe`, replacing the separate `df.count()` and ingest's schedule pass. Bipartite greedy grouping also counts source and target ids in a single pass instead of two. A predefined components load now evaluates its input 2 times instead of 4 (greedy) or 3 (hash); a bipartite load with 3 batches 4 times instead of 7 (greedy) or 5 (hash).
 * Monopartite greedy grouping hashes the source and target ids as their common type, so the same id in an `int` column and a `long` column gets the same group, as the previous value join did.
+* `build_relationship` groups before deciding between the serial and parallel paths, since the row count now comes from grouping. Inputs at or below `max_serial` still load serially, after a grouping pass over the (small) input.
 * Removed the internal `create_value_groupings` helper from `neo4j_parallel_spark_loader.utils.grouping`, replaced by `create_key_groupings` and `apply_key_groupings`.
 
 ## v0.6.0 (2026-09-19)
