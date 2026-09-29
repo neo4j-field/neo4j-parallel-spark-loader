@@ -2,13 +2,13 @@ from typing import List, Literal, Optional
 
 from pyspark.sql import DataFrame
 
-from neo4j_parallel_spark_loader import ingest_spark_dataframe
-from neo4j_parallel_spark_loader.bipartite import (
+from ..bipartite import (
     group_and_batch_spark_dataframe as group_and_batch_bipartite,
 )
-from neo4j_parallel_spark_loader.predefined_components import (
+from ..predefined_components import (
     group_and_batch_spark_dataframe as group_and_batch_predefined,
 )
+from .ingest import ingest_spark_dataframe
 
 
 def build_relationship(

@@ -1,3 +1,9 @@
+## Unreleased
+
+### Fixed
+
+* `build_relationship` is now exported from the package root, so `from neo4j_parallel_spark_loader import build_relationship` works as documented in the README. `neo4j_parallel_spark_loader.utils.build_relationship` now uses relative imports to avoid a circular import with the root package.
+
 ## v0.6.0 (2026-09-19)
 
 ### Fixed
