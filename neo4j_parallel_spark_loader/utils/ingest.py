@@ -211,8 +211,11 @@ def ingest_spark_dataframe(
             # partition) is preserved, so groups still never share a writer
             batch_df = batch_df.sortWithinPartitions(*sort_columns)
 
+        # `batch` and `group` only drive scheduling and partitioning; the connector would
+        # otherwise write them onto every relationship as properties
         (
             batch_df.drop(_GROUP_KEY_COLUMN)
+            .drop("batch", "group")
             .write.mode(save_mode)
             .format("org.neo4j.spark.DataSource")
             .options(**options)

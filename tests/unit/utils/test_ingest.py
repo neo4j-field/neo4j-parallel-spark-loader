@@ -112,17 +112,39 @@ def test_invalid_on_null_batch(spark_fixture: SparkSession) -> None:
 
 def _capture_neo4j_saves(mocker: MockerFixture) -> List[DataFrame]:
     """
-    Replace `DataFrameWriter.save` (the Neo4j connector write) with a recorder of the
-    DataFrame being written. Parquet writes use `DataFrameWriter.parquet` and are unaffected.
+    Record each batch's DataFrame as it is about to be written to Neo4j, with its `batch`
+    and `group` columns still present so tests can inspect scheduling and partitioning.
+    The write itself is `DataFrameWriter.save` (the Neo4j connector); `batch` and `group`
+    are dropped just before it, so that is the last point they can be observed. Use
+    `_capture_written_frames` to see exactly what reaches the connector. Parquet writes use
+    `DataFrameWriter.parquet` and are unaffected.
     """
     captured: List[DataFrame] = []
+    original_drop = DataFrame.drop
+
+    def spy_drop(self, *cols):
+        if cols == ("batch", "group"):
+            captured.append(self)
+        return original_drop(self, *cols)
 
     def fake_save(self, *args, **kwargs):
-        captured.append(self._df)
+        return MagicMock()
+
+    mocker.patch.object(DataFrame, "drop", spy_drop)
+    mocker.patch.object(DataFrameWriter, "save", fake_save)
+    return captured
+
+
+def _capture_written_frames(mocker: MockerFixture) -> List[DataFrame]:
+    """Record the DataFrame that actually reaches the Neo4j connector for each batch."""
+    written: List[DataFrame] = []
+
+    def fake_save(self, *args, **kwargs):
+        written.append(self._df)
         return MagicMock()
 
     mocker.patch.object(DataFrameWriter, "save", fake_save)
-    return captured
+    return written
 
 
 def _assert_one_group_per_partition(batch_df: DataFrame) -> None:
@@ -183,6 +205,27 @@ def test_ingest_writes_each_group_from_its_own_partition(
         assert batch_df.select("batch").distinct().count() == 1
         assert "__neo4j_parallel_group_key" not in batch_df.columns
         _assert_one_group_per_partition(batch_df)
+
+
+def test_ingest_does_not_write_batch_or_group_columns(
+    spark_fixture: SparkSession, mocker: MockerFixture
+) -> None:
+    """`batch` and `group` are scheduling metadata; the connector writes every column it
+    is given as a relationship property, so they must not reach it."""
+    sdf = spark_fixture.range(3000).selectExpr(
+        "cast(id * 7919 % 211 as string) as src",
+        "cast(id * 104729 % 389 as string) as tgt",
+        "id % 97 as weight",
+    )
+    grouped = group_and_batch_bipartite(sdf, "src", "tgt", 8, strategy="hash")
+    expected_batches = grouped.select("batch").distinct().count()
+
+    written = _capture_written_frames(mocker)
+    ingest_spark_dataframe(grouped, "Append", options={})
+
+    assert len(written) == expected_batches
+    for batch_df in written:
+        assert sorted(batch_df.columns) == ["src", "tgt", "weight"]
 
 
 def test_ingest_predefined_components_one_partition_per_group(
