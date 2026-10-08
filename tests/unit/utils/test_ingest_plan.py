@@ -57,14 +57,40 @@ def _group(scenario: str, sdf: DataFrame, num_groups: int, strategy: str):
 
 
 def _capture_neo4j_saves(mocker: MockerFixture) -> List[DataFrame]:
+    """
+    Record each batch's DataFrame as it is about to be written to Neo4j, with its `batch`
+    and `group` columns still present so tests can inspect scheduling and partitioning.
+    The write itself is `DataFrameWriter.save` (the Neo4j connector); `batch` and `group`
+    are dropped just before it, so that is the last point they can be observed. Use
+    `_capture_written_frames` to see exactly what reaches the connector. Parquet writes use
+    `DataFrameWriter.parquet` and are unaffected.
+    """
     captured: List[DataFrame] = []
+    original_drop = DataFrame.drop
+
+    def spy_drop(self, *cols):
+        if cols == ("batch", "group"):
+            captured.append(self)
+        return original_drop(self, *cols)
 
     def fake_save(self, *args, **kwargs):
-        captured.append(self._df)
+        return MagicMock()
+
+    mocker.patch.object(DataFrame, "drop", spy_drop)
+    mocker.patch.object(DataFrameWriter, "save", fake_save)
+    return captured
+
+
+def _capture_written_frames(mocker: MockerFixture) -> List[DataFrame]:
+    """Record the DataFrame that actually reaches the Neo4j connector for each batch."""
+    written: List[DataFrame] = []
+
+    def fake_save(self, *args, **kwargs):
+        written.append(self._df)
         return MagicMock()
 
     mocker.patch.object(DataFrameWriter, "save", fake_save)
-    return captured
+    return written
 
 
 def _batch_contents(captured: List[DataFrame]) -> dict:
